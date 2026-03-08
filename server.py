@@ -2102,7 +2102,21 @@ async def create_storybook(room_id: str):
     if not data:
         return HTMLResponse("<h1>Room not found</h1>", status_code=404)
 
+    # Build full transcript from TranscriptLogger or captions
+    full_transcript = ""
+    transcript_logger = TranscriptLogger(room_id)
+    if transcript_logger.path.exists():
+        full_transcript = transcript_logger.read_markdown()
+
+    if not full_transcript:
+        caption_texts = [
+            c.get("text", "") for c in data["captions"]
+            if isinstance(c, dict) and c.get("text", "").strip()
+        ]
+        full_transcript = "\n".join(caption_texts)
+
     storybook_input = {
+        "transcript": full_transcript,
         "screenshots": data["screenshots"],
         "voice_snippets": data["voice_snippets"],
         "scene_descriptions": data["scene_descriptions"],
@@ -2242,8 +2256,31 @@ async def _run_parallel_generation(task_id: str, room_id: str, data: dict):
     async def gen_storybook():
         task["storybook"]["status"] = "running"
         try:
+            # Build full transcript: prefer TranscriptLogger markdown (has timestamps,
+            # speakers, translations), fall back to joining all captions text.
+            full_transcript = ""
+            transcript_logger = TranscriptLogger(room_id)
+            if transcript_logger.path.exists():
+                full_transcript = transcript_logger.read_markdown()
+                logger.info(f"Storybook using TranscriptLogger markdown ({len(full_transcript)} chars)")
+            
+            if not full_transcript:
+                # Fall back to captions array — join all translated text
+                caption_texts = [
+                    c.get("text", "") for c in data["captions"]
+                    if isinstance(c, dict) and c.get("text", "").strip()
+                ]
+                full_transcript = "\n".join(caption_texts)
+                logger.info(f"Storybook using {len(caption_texts)} captions as transcript")
+
+            if not full_transcript.strip():
+                logger.warning("No transcript available for storybook generation")
+                task["storybook"] = {"status": "empty", "message": "No conversation transcript captured"}
+                return
+
             async with _gemini_sem:
                 storybook_input = {
+                    "transcript": full_transcript,
                     "screenshots": data["screenshots"],
                     "voice_snippets": data["voice_snippets"],
                     "scene_descriptions": data["scene_descriptions"],
