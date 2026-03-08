@@ -76,6 +76,10 @@ python server.py
 
 Open [http://localhost:8000](http://localhost:8000) in two browser tabs. Join the same room with different languages. Start talking.
 
+Demo URLs:
+- `http://localhost:8000/demo/live` (live translation demo)
+- `http://localhost:8000/demo/memory` (storybook + memory video demo)
+
 ### Deploy to Cloud Run
 
 ```bash
@@ -90,6 +94,10 @@ gcloud run deploy together \
 ```
 
 The `--session-affinity` flag is important for WebSocket support.
+
+After deploy, use:
+- `https://<your-service-url>/demo/live`
+- `https://<your-service-url>/demo/memory`
 
 ---
 

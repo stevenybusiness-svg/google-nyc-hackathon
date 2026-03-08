@@ -18,8 +18,8 @@ COSTS = {
     "gemini_flash_image_output": 0.016,         # $0.016 per image (stylization)
     "veo_video_sec": 0.30,                      # $0.30 per second of video
     "vision_api_label": 0.0015,                 # $1.50 per 1000 images
-    "elevenlabs_stt_char": 0.000024,            # $24 per 1M characters
-    "elevenlabs_tts_char": 0.00024,             # $240 per 1M characters
+    "gradium_stt_sec": 0.000003,                # $3 per 1000 seconds (3 credits/sec)
+    "gradium_tts_char": 0.000001,               # $1 per 1M characters (1 credit/char)
 }
 
 # Warning thresholds in USD
