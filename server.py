@@ -8,6 +8,8 @@ import logging
 import os
 import base64
 import time
+import struct
+import zlib
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -58,58 +60,121 @@ except Exception as e:
 TRANSLATION_MODEL = "gemini-2.5-flash-native-audio-latest"
 
 # ---------------------------------------------------------------------------
-# ElevenLabs fallback (STT + TTS when Gemini is rate-limited or down)
+# Gradium fallback (STT + TTS when Gemini Live is rate-limited or recovering)
+# Gradium supports: English, French, Spanish, German, Portuguese
+# For Mandarin/Hindi/other: Gemini handles the translation; Gradium voices the
+# English (or other supported) output side only.
 # ---------------------------------------------------------------------------
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+GRADIUM_API_KEY = os.getenv("GRADIUM_API_KEY")
 
-async def elevenlabs_stt(audio_bytes: bytes) -> str | None:
-    """Transcribe audio via ElevenLabs Scribe v2."""
-    if not ELEVENLABS_API_KEY:
+_GRADIUM_BASE = "https://us.api.gradium.ai/api/"  # key is provisioned on US servers
+
+# Language → Gradium flagship voice (feminine / warm default per language)
+_GRADIUM_VOICE_MAP: dict[str, str] = {
+    "english":    "YTpq7expH9539ERJ",  # Emma (US)
+    "french":     "b35yykvVppLXyw_l",  # Elise (FR)
+    "spanish":    "B36pbz5_UoWn4BDl",  # Valentina (MX)
+    "german":     "-uP9MuGtBqAvEyxI",  # Mia (DE)
+    "portuguese": "pYcGZz9VOo4n2ynh",  # Alice (BR)
+}
+_GRADIUM_DEFAULT_VOICE = "YTpq7expH9539ERJ"  # Emma — English fallback
+
+# Languages Gradium TTS can voice (map to canonical key)
+_GRADIUM_SUPPORTED = {"english", "french", "spanish", "german", "portuguese"}
+
+
+def _gradium_voice_for(language: str) -> str | None:
+    """Return a Gradium voice_id for the given language, or None if unsupported."""
+    key = language.lower().strip()
+    return _GRADIUM_VOICE_MAP.get(key)
+
+
+def _gradium_client():
+    """Create a fresh GradiumClient pointed at the US region (where the key is provisioned)."""
+    import gradium
+    return gradium.client.GradiumClient(
+        api_key=GRADIUM_API_KEY,
+        base_url="https://us.api.gradium.ai/api/",
+    )
+
+
+async def gradium_stt(audio_bytes: bytes) -> str | None:
+    """Transcribe audio via Gradium STT (streaming WebSocket).
+
+    Accepts PCM 16kHz mono (our browser format) wrapped as WAV.
+    Returns the full transcript or None on failure.
+
+    Note: Gradium STT requires a paid-tier API key with WebSocket access.
+    If auth fails (free tier), this returns None gracefully and the caller
+    logs a warning — Gemini Live transcription remains the primary STT path.
+    """
+    if not GRADIUM_API_KEY:
         return None
     try:
-        import httpx
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://api.elevenlabs.io/v1/speech-to-text",
-                headers={"xi-api-key": ELEVENLABS_API_KEY},
-                files={"file": ("audio.wav", _pcm_to_wav(audio_bytes), "audio/wav")},
-                data={"model_id": "scribe_v1"},
-                timeout=10.0,
-            )
-            if resp.status_code == 200:
-                text = resp.json().get("text", "")
-                log_api_call("elevenlabs_stt_char", len(text) / 1000.0, "STT fallback")
-                return text
+        client = _gradium_client()
+        wav = _pcm_to_wav(audio_bytes, sample_rate=16000)
+
+        async def _audio_gen():
+            chunk_size = 8192
+            for i in range(0, len(wav), chunk_size):
+                yield wav[i : i + chunk_size]
+
+        stream = await client.stt_stream(
+            {"model_name": "default", "input_format": "wav"},
+            _audio_gen(),
+        )
+        parts: list[str] = []
+        async for text in stream.iter_text():
+            if text and text.strip():
+                parts.append(text.strip())
+        result = " ".join(parts).strip()
+        if result:
+            log_api_call("gradium_stt_sec", len(audio_bytes) / 32000.0, "Gradium STT")
+        return result or None
     except Exception as e:
-        logger.error(f"ElevenLabs STT error: {e}")
+        err_str = str(e)
+        if "Invalid or expired API key" in err_str or "1008" in err_str:
+            logger.warning(
+                "Gradium STT: WebSocket auth rejected — STT requires a paid Gradium plan. "
+                "Gemini Live handles primary transcription; Gradium TTS still active."
+            )
+        else:
+            logger.error(f"Gradium STT error: {type(e).__name__}: {err_str[:120]}")
     return None
 
 
-async def elevenlabs_tts(text: str, voice_id: str = "21m00Tcm4TlvDq8ikWAM") -> bytes | None:
-    """Generate speech via ElevenLabs Flash v2.5."""
-    if not ELEVENLABS_API_KEY:
+async def gradium_tts(text: str, language: str = "English") -> bytes | None:
+    """Generate speech via Gradium TTS POST endpoint.
+
+    Returns PCM bytes at 16kHz (matching Gemini Live output format) or None.
+    Only called when the target language is supported by Gradium.
+    """
+    if not GRADIUM_API_KEY:
         return None
+    voice_id = _gradium_voice_for(language) or _GRADIUM_DEFAULT_VOICE
     try:
         import httpx
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+        async with httpx.AsyncClient(timeout=12.0) as http:
+            resp = await http.post(
+                f"{_GRADIUM_BASE}post/speech/tts",
                 headers={
-                    "xi-api-key": ELEVENLABS_API_KEY,
+                    "x-api-key": GRADIUM_API_KEY,
                     "Content-Type": "application/json",
                 },
                 json={
                     "text": text,
-                    "model_id": "eleven_flash_v2_5",
+                    "voice_id": voice_id,
                     "output_format": "pcm_16000",
+                    "only_audio": True,
                 },
-                timeout=10.0,
             )
             if resp.status_code == 200:
-                log_api_call("elevenlabs_tts_char", len(text) / 1000.0, "TTS fallback")
-                return resp.content
+                log_api_call("gradium_tts_char", len(text), "Gradium TTS fallback")
+                return resp.content  # raw PCM 16kHz bytes
+            else:
+                logger.warning(f"Gradium TTS HTTP {resp.status_code}: {resp.text[:120]}")
     except Exception as e:
-        logger.error(f"ElevenLabs TTS error: {e}")
+        logger.error(f"Gradium TTS error: {type(e).__name__}: {e}")
     return None
 
 
@@ -190,6 +255,11 @@ class Room:
         self._last_vision_labels: set[str] = set()
         self._last_visual_caption_ts: float = 0.0
 
+        # Mood & stylization
+        self.mood: str = "sentimental"  # "sentimental" or "funny"
+        self.stylized_images: list[dict] = []  # bg-stylized captures
+        self._stylize_tasks: list[asyncio.Task] = []
+
         # Concurrency: protects screenshots/captions/scenes/snippets
         self._state_lock = asyncio.Lock()
 
@@ -217,14 +287,21 @@ LANGUAGES:
 """
 
     async def start_gemini_session(self):
-        """Connect to Gemini Live API, fall back to ElevenLabs if it fails."""
+        """Connect to Gemini Live API; activate Gradium fallback if it fails."""
         if not gemini_client:
             logger.error("No Gemini client — cannot start session")
             self.use_fallback = True
             return
 
         config = types.LiveConnectConfig(
-            response_modalities=["AUDIO", "TEXT"],
+            response_modalities=["AUDIO"],
+            input_audio_transcription=types.AudioTranscriptionConfig(),
+            output_audio_transcription=types.AudioTranscriptionConfig(),
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Aoede")
+                )
+            ),
             system_instruction=types.Content(
                 parts=[types.Part(text=self.system_prompt())]
             ),
@@ -240,8 +317,8 @@ LANGUAGES:
             logger.info(f"Room {self.room_id}: Gemini session started")
         except Exception as e:
             logger.error(f"Room {self.room_id}: Failed to start Gemini session: {e}")
-            if ELEVENLABS_API_KEY:
-                logger.info(f"Room {self.room_id}: Falling back to ElevenLabs")
+            if GRADIUM_API_KEY:
+                logger.info(f"Room {self.room_id}: Falling back to Gradium TTS pipeline")
                 self.use_fallback = True
                 self.gemini_session = None
             else:
@@ -253,93 +330,136 @@ LANGUAGES:
         Auto-restarts up to 3 times on transient errors before falling back.
         """
         max_retries = 3
-        for attempt in range(max_retries + 1):
+        retries = 0
+        output_bytes_total = 0
+
+        while True:
             if not self.gemini_session:
                 return
-            output_bytes_total = 0
+
+            turn_speaker_id: Optional[str] = None
+            turn_target_id: Optional[str] = None
+            translated_text: Optional[str] = None
+            original_text: Optional[str] = None
+            saw_message = False
 
             try:
+                # NOTE: google-genai AsyncSession.receive() yields one complete turn.
+                # Keep calling it so the room continues streaming after each turn.
                 async for response in self.gemini_session.receive():
-                    if response.server_content:
-                        model_turn = response.server_content.model_turn
-                        if model_turn and model_turn.parts:
-                            for part in model_turn.parts:
-                                target_id = self._current_target_id()
+                    saw_message = True
+                    if not response.server_content:
+                        continue
 
-                                if part.inline_data and part.inline_data.mime_type and "audio" in part.inline_data.mime_type:
-                                    pcm = part.inline_data.data
-                                    output_bytes_total += len(pcm)
+                    sc = response.server_content
+                    if turn_speaker_id is None:
+                        turn_speaker_id = self._speaker_for_current_turn()
+                        if turn_speaker_id:
+                            turn_target_id = self._peer_id(turn_speaker_id)
 
-                                    if output_bytes_total >= 1_440_000:
-                                        duration_min = (output_bytes_total / 2 / 24000) / 60.0
-                                        log_api_call("gemini_live_audio_output_min", duration_min, f"Room {self.room_id}")
-                                        output_bytes_total = 0
+                    # ── Translated audio (model output) ──────────────────────
+                    model_turn = sc.model_turn
+                    if model_turn and model_turn.parts:
+                        for part in model_turn.parts:
+                            if part.inline_data and part.inline_data.mime_type and "audio" in part.inline_data.mime_type:
+                                pcm = part.inline_data.data
+                                output_bytes_total += len(pcm)
 
-                                    audio_b64 = base64.b64encode(pcm).decode()
-                                    await self._send_to_target_or_all({
-                                        "type": "audio",
-                                        "data": audio_b64,
-                                        "mime_type": part.inline_data.mime_type,
-                                    }, target_id)
+                                if output_bytes_total >= 1_440_000:
+                                    duration_min = (output_bytes_total / 2 / 24000) / 60.0
+                                    log_api_call("gemini_live_audio_output_min", duration_min, f"Room {self.room_id}")
+                                    output_bytes_total = 0
 
-                                if part.text:
-                                    speaker_id = self.last_speaker_id
-                                    caption = {
-                                        "type": "caption",
-                                        "text": part.text,
-                                        "speaker": speaker_id or "",
-                                        "side": "theirs",
-                                    }
-                                    async with self._state_lock:
-                                        self.captions.append(caption)
-                                    await self._send_to_target_or_all(caption, target_id)
-                                    if speaker_id and speaker_id in self.participants:
-                                        try:
-                                            await self.participants[speaker_id].ws.send_text(
-                                                json.dumps({
-                                                    "type": "caption",
-                                                    "text": part.text,
-                                                    "speaker": speaker_id,
-                                                    "side": "mine",
-                                                })
-                                            )
-                                        except Exception:
-                                            pass
+                                audio_b64 = base64.b64encode(pcm).decode()
+                                await self._send_to_target_or_all({
+                                    "type": "audio",
+                                    "data": audio_b64,
+                                    "mime_type": part.inline_data.mime_type,
+                                }, turn_target_id)
 
-                                    text_lower = part.text.lower()
-                                    if any(kw in text_lower for kw in ["love", "miss", "haha", "laugh", "beautiful", "happy"]):
-                                        async with self._state_lock:
-                                            self.voice_snippets.append({
-                                                "text": part.text,
-                                                "timestamp": self.get_formatted_time(),
-                                                "speaker": "Translated Voice"
-                                            })
+                    # Keep latest transcript chunk, then emit once per completed turn.
+                    out_tx = sc.output_transcription
+                    if out_tx and out_tx.text:
+                        translated_text = out_tx.text
+                    in_tx = sc.input_transcription
+                    if in_tx and in_tx.text:
+                        original_text = in_tx.text
 
-                                    if check_trigger(part.text):
-                                        self._activate_vision_window(target_id)
-                                        await self._broadcast({
-                                            "type": "trigger",
-                                            "trigger": "visual",
-                                            "text": part.text,
-                                            "target_participant_id": target_id,
-                                        })
-                # Stream ended cleanly — no retry needed
-                return
+                if not saw_message:
+                    await asyncio.sleep(0.05)
+                    continue
+
+                if translated_text:
+                    caption = {
+                        "type": "caption",
+                        "text": translated_text,
+                        "speaker": turn_speaker_id or "",
+                        "side": "theirs",
+                    }
+                    async with self._state_lock:
+                        self.captions.append(caption)
+                    await self._send_to_target_or_all(caption, turn_target_id)
+
+                    text_lower = translated_text.lower()
+                    if any(kw in text_lower for kw in ["love", "miss", "haha", "laugh", "beautiful", "happy"]):
+                        async with self._state_lock:
+                            self.voice_snippets.append({
+                                "text": translated_text,
+                                "timestamp": self.get_formatted_time(),
+                                "speaker": "Translated Voice",
+                            })
+                            
+                    # Start laughing narration
+                    if "haha" in text_lower or "laugh" in text_lower:
+                        now = time.time()
+                        if (now - getattr(self, "_last_laugh_narration_ts", 0)) > 15.0:
+                            self._last_laugh_narration_ts = now
+                            asyncio.create_task(self._narrate_action("Wow you guys are a riot", turn_speaker_id))
+
+                    if check_trigger(translated_text):
+                        self._activate_vision_window(turn_target_id)
+                        await self._broadcast({
+                            "type": "trigger",
+                            "trigger": "visual",
+                            "text": translated_text,
+                            "target_participant_id": turn_target_id,
+                        })
+
+                if original_text and turn_speaker_id and turn_speaker_id in self.participants:
+                    try:
+                        await self.participants[turn_speaker_id].ws.send_text(
+                            json.dumps({
+                                "type": "caption",
+                                "text": original_text,
+                                "speaker": turn_speaker_id,
+                                "side": "mine",
+                            })
+                        )
+                    except Exception:
+                        pass
+
+                retries = 0
             except asyncio.CancelledError:
                 return
             except Exception as e:
-                logger.warning(f"Room {self.room_id}: Receive loop error (attempt {attempt+1}/{max_retries+1}): {e}")
-                if attempt < max_retries:
+                retries += 1
+                logger.warning(
+                    f"Room {self.room_id}: Receive loop error "
+                    f"(attempt {retries}/{max_retries}): {e}"
+                )
+                if retries <= max_retries:
                     await asyncio.sleep(1.0)
-                    # Try to reconnect the Gemini session
                     try:
                         await self._reconnect_gemini_session()
                     except Exception as re:
                         logger.error(f"Room {self.room_id}: Reconnect failed: {re}")
                 else:
-                    logger.error(f"Room {self.room_id}: Receive loop exhausted retries, switching to fallback")
+                    logger.error(
+                        f"Room {self.room_id}: Receive loop exhausted retries, switching to fallback"
+                    )
                     self.use_fallback = True
                     self.gemini_session = None
+                    return
 
     async def _reconnect_gemini_session(self):
         """Tear down and re-establish the Gemini Live session."""
@@ -349,7 +469,14 @@ LANGUAGES:
             except Exception:
                 pass
         config = types.LiveConnectConfig(
-            response_modalities=["AUDIO", "TEXT"],
+            response_modalities=["AUDIO"],
+            input_audio_transcription=types.AudioTranscriptionConfig(),
+            output_audio_transcription=types.AudioTranscriptionConfig(),
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Aoede")
+                )
+            ),
             system_instruction=types.Content(
                 parts=[types.Part(text=self.system_prompt())]
             ),
@@ -413,7 +540,7 @@ LANGUAGES:
         except Exception as e:
             logger.error(f"Room {self.room_id}: send_video error: {e}")
 
-    async def analyze_frame_with_vision(self, frame_bytes: bytes):
+    async def analyze_frame_with_vision(self, frame_bytes: bytes, sender_id: Optional[str] = None):
         """Analyze frame via Vision API. Runs gRPC in a thread to avoid blocking
         the event loop. Uses semaphore to cap concurrent Vision calls."""
         if not vision_client:
@@ -427,6 +554,7 @@ LANGUAGES:
                     features=[
                         vision.Feature(type_=vision.Feature.Type.LABEL_DETECTION, max_results=5),
                         vision.Feature(type_=vision.Feature.Type.FACE_DETECTION, max_results=1),
+                        vision.Feature(type_=vision.Feature.Type.OBJECT_LOCALIZATION, max_results=5),
                     ],
                 )
                 batch_response = await asyncio.to_thread(
@@ -466,10 +594,14 @@ LANGUAGES:
                 if len(self.screenshots) < 20:
                     self.screenshots.append({
                         "data": base64.b64encode(frame_bytes).decode(),
+                        "mime_type": "image/jpeg",
                         "timestamp": self.get_formatted_time(),
                         "participant": self.vision_target_id or "unknown",
                         "description": caption_text or "Captured frame",
                     })
+
+            # Emotion and Object Bounding Boxes
+            vision_boxes = []
 
             if response.face_annotations:
                 face = response.face_annotations[0]
@@ -482,6 +614,8 @@ LANGUAGES:
                 dominant_name, dominant_score = max(
                     raw_emotions.items(), key=lambda x: x[1]
                 )
+
+                # Broadcast sentiment badge for strong emotions
                 if dominant_score >= 4:
                     await self._broadcast({
                         "type": "sentiment",
@@ -489,8 +623,152 @@ LANGUAGES:
                         "score": dominant_score,
                     })
 
+                # Build bounding box only for faces with detectable emotion (>= POSSIBLE)
+                if dominant_score >= 2:
+                    color = "purple"
+                    label = dominant_name.capitalize()
+
+                    if dominant_name == "happiness":
+                        color = "green"
+                        label = "😊 Content/Happy"
+                    elif dominant_name == "anger":
+                        color = "red"
+                        label = "😠 Angry/Frustrated"
+                    elif dominant_name in ["sadness", "surprise"]:
+                        color = "purple"
+                        label = "😟 Worried/Anxious"
+
+                    vertices = [{"x": v.x, "y": v.y} for v in face.bounding_poly.vertices]
+
+                    vision_boxes.append({
+                        "vertices": vertices,
+                        "color": color,
+                        "label": label,
+                        "type": "face",
+                        "normalized": False
+                    })
+
+                    # Trigger narration for big smiles
+                    if dominant_name == "happiness" and dominant_score >= 4 and is_key_moment:
+                        name = sender_id.split('_')[0] if sender_id else "Someone"
+                        narration = f"Wow, {name} is really happy!"
+                        asyncio.create_task(self._narrate_action(narration, sender_id))
+
+            for obj in response.localized_object_annotations:
+                name_lower = obj.name.lower()
+                if name_lower in ["dog", "cat", "animal", "bird", "tattoo", "hand", "finger", "person"]:
+                    vertices = [{"x": v.x, "y": v.y} for v in obj.bounding_poly.normalized_vertices]
+                    # Assign context-appropriate colors
+                    obj_color = "green"
+                    obj_label = obj.name.capitalize()
+                    if name_lower in ["dog", "cat", "animal", "bird"]:
+                        obj_label = f"🐾 {obj.name.capitalize()}"
+                    elif name_lower == "tattoo":
+                        obj_label = "🎨 Tattoo"
+                    elif name_lower in ["hand", "finger"]:
+                        obj_label = f"👋 {obj.name.capitalize()}"
+                    elif name_lower == "person":
+                        obj_label = "👤 Person"
+
+                    vision_boxes.append({
+                        "vertices": vertices,
+                        "color": obj_color,
+                        "label": obj_label,
+                        "type": "object",
+                        "normalized": True
+                    })
+
+                    if name_lower == "tattoo" or ("tattoo" in [l.description.lower() for l in response.label_annotations]):
+                        if is_key_moment:
+                            asyncio.create_task(self._narrate_action("Cool thing you're showing!", sender_id))
+
+            # Send all boxes + scene labels to frontend
+            if vision_boxes:
+                await self._broadcast({
+                    "type": "vision_boxes",
+                    "boxes": vision_boxes,
+                    "scene_labels": top_labels,
+                })
+
         except Exception as e:
             logger.error(f"Room {self.room_id}: Vision API error: {e}")
+
+    async def _narrate_action(self, text: str, speaker_id: Optional[str]):
+        """Helper to narrate a specific action phrase."""
+        if not GRADIUM_API_KEY:
+            return
+        try:
+            tts_audio = await gradium_tts(text, language="English")
+            if tts_audio:
+                audio_b64 = base64.b64encode(tts_audio).decode()
+                await self._broadcast({
+                    "type": "audio",
+                    "data": audio_b64,
+                    "mime_type": "audio/pcm;rate=16000",
+                })
+                # Add to transcript for UI
+                await self._broadcast({
+                    "type": "narration",
+                    "text": f"*{text}*",
+                })
+        except Exception as e:
+            logger.error(f"Action narration error: {e}")
+
+    def _narrator_fallback_text(self, prompt: str) -> str:
+        """Local backup narrator response when model generation is unavailable."""
+        p = (prompt or "").strip()
+        if not p:
+            return "Narrator is listening."
+        if "summary" in p.lower():
+            return "Narrator: A warm call, small details, big feelings, and a gentle goodbye."
+        if "mood" in p.lower():
+            return f"Narrator: Right now the room feels {self.mood}."
+        return f"Narrator: {p[:140]}"
+
+    async def narrate_storybook_prompt(self, prompt: str, requester_id: str):
+        """Answer an interactive 'Narrator' prompt using recent room context."""
+        prompt = (prompt or "").strip()
+        if not prompt:
+            return
+
+        recent_caps = [
+            c.get("text", "") for c in self.captions[-10:]
+            if isinstance(c, dict) and c.get("text")
+        ]
+        recent_scenes = [
+            s.get("description", "") for s in self.scene_descriptions[-5:]
+            if isinstance(s, dict) and s.get("description")
+        ]
+        fallback = self._narrator_fallback_text(prompt)
+        out = fallback
+
+        if gemini_client:
+            try:
+                context = (
+                    "You are Narrator, a warm storybook voice in a live bilingual call.\n"
+                    "Reply in 1-2 short sentences, emotionally vivid but concise.\n"
+                    "Avoid lists and avoid meta commentary.\n\n"
+                    f"Room mood: {self.mood}\n"
+                    f"Recent captions: {' | '.join(recent_caps) if recent_caps else 'None'}\n"
+                    f"Recent scenes: {' | '.join(recent_scenes) if recent_scenes else 'None'}\n\n"
+                    f"User prompt: {prompt}\n\n"
+                    "Narrator reply:"
+                )
+                async with _gemini_sem:
+                    resp = await gemini_client.aio.models.generate_content(
+                        model="gemini-2.5-flash-lite",
+                        contents=context,
+                    )
+                text = (resp.text or "").strip() if resp else ""
+                if text:
+                    out = text
+            except Exception as e:
+                logger.warning(f"Room {self.room_id}: Narrator generation failed: {e}")
+
+        await self._send_to_target_or_all(
+            {"type": "narrator", "text": out},
+            target_id=requester_id,
+        )
 
     def _current_exclude_id(self) -> Optional[str]:
         """Exclude the most recent speaker to avoid echo, within a short window."""
@@ -500,9 +778,18 @@ LANGUAGES:
 
     def _current_target_id(self) -> Optional[str]:
         """Return the intended listener if we have a recent speaker and two participants."""
-        if self.last_speaker_id and (time.time() - self.last_speaker_ts) < 10.0:
-            if len(self.participants) == 2:
-                return self._peer_id(self.last_speaker_id)
+        speaker_id = self._speaker_for_current_turn()
+        if speaker_id and len(self.participants) == 2:
+            return self._peer_id(speaker_id)
+        return None
+
+    def _speaker_for_current_turn(self) -> Optional[str]:
+        """Best-effort speaker identity used for caption/audio routing."""
+        now = time.time()
+        if self.active_speaker_id and (now - self.active_speaker_ts) < 3.0:
+            return self.active_speaker_id
+        if self.last_speaker_id and (now - self.last_speaker_ts) < 10.0:
+            return self.last_speaker_id
         return None
 
     def _peer_id(self, participant_id: str) -> Optional[str]:
@@ -584,8 +871,9 @@ LANGUAGES:
                 "text": narration_text,
             }, exclude=speaker_id)
 
-            if ELEVENLABS_API_KEY:
-                tts_audio = await elevenlabs_tts(narration_text)
+            # Voice narration via Gradium TTS (English output only)
+            if GRADIUM_API_KEY:
+                tts_audio = await gradium_tts(narration_text, language="English")
                 if tts_audio:
                     audio_b64 = base64.b64encode(tts_audio).decode()
                     await self._broadcast({
@@ -669,6 +957,65 @@ def get_or_create_room(room_id: str, lang_a: str = "Hindi", lang_b: str = "Engli
     return rooms[room_id]
 
 
+async def _stylize_in_background(room: Room, frame_b64: str, index: int):
+    """Stylize a captured photo in the background using Gemini image model.
+    
+    Runs with _gemini_sem and stores result in room.stylized_images.
+    """
+    if not gemini_client:
+        return
+    mood = room.mood
+    if mood == "funny":
+        prompt = (
+            "Transform this photograph into a hilarious, exaggerated cartoon illustration. "
+            "STYLE: Bold colors, big expressive eyes, over-the-top facial expressions, "
+            "comic book energy, speech-bubble-ready. Think Pixar meets political cartoon. "
+            "Make it genuinely funny — amplify anything awkward or silly in the scene. "
+            "Add visual humor: a surprised cat in the background, exaggerated props, etc."
+        )
+    else:
+        prompt = (
+            "Transform this photograph into a warm, dreamy watercolor illustration. "
+            "STYLE: Soft golden-hour lighting, gentle washes of amber and rose, "
+            "slightly blurred edges like a treasured memory. Emphasize warmth, love, "
+            "and human connection. The feeling of looking at a Polaroid from the best day of your life."
+        )
+    try:
+        async with _gemini_sem:
+            response = await gemini_client.aio.models.generate_content(
+                model="gemini-2.5-flash-image",
+                contents=[
+                    {"inline_data": {"mime_type": "image/jpeg", "data": frame_b64}},
+                    {"text": prompt},
+                ],
+                config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]),
+            )
+        if response.candidates and response.candidates[0].content:
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, "inline_data") and part.inline_data:
+                    img_data = part.inline_data.data
+                    if isinstance(img_data, str):
+                        img_data = base64.b64decode(img_data)
+                    async with room._state_lock:
+                        room.stylized_images.append({
+                            "data": img_data,
+                            "mime_type": part.inline_data.mime_type or "image/png",
+                            "index": index,
+                            "mood": mood,
+                        })
+                    logger.info(f"Room {room.room_id}: photo #{index} stylized ({mood})")
+                    # Notify all participants
+                    await room._broadcast({
+                        "type": "photo_stylized",
+                        "index": index,
+                        "mood": mood,
+                    })
+                    return
+        logger.warning(f"Room {room.room_id}: stylization #{index} returned no image (rate limited?)")
+    except Exception as e:
+        logger.error(f"Room {room.room_id}: stylization #{index} error: {e}")
+
+
 def _archive_room(room: Room):
     """Preserve room data after all participants leave for memorabilia generation."""
     closed_rooms[room.room_id] = {
@@ -680,6 +1027,8 @@ def _archive_room(room: Room):
         "captions": room.captions,
         "scene_descriptions": room.scene_descriptions,
         "voice_snippets": room.voice_snippets,
+        "stylized_images": room.stylized_images,
+        "mood": room.mood,
         "start_time": room.start_time,
         "participant_names": room.participant_history or list(room.participants.keys()),
     }
@@ -808,20 +1157,64 @@ async def websocket_endpoint(
                         # Process with Vision API: use fast debounce in trigger
                         # window, slower debounce (5s) for ambient camera
                         if room._vision_allowed(participant_id):
-                            asyncio.create_task(room.analyze_frame_with_vision(frame_bytes))
+                            asyncio.create_task(room.analyze_frame_with_vision(frame_bytes, participant_id))
                             asyncio.create_task(
                                 room.narrate_frame_with_gemini(
                                     frame_bytes, room.last_speaker_id
                                 )
                             )
                         elif room._ambient_vision_allowed(participant_id):
-                            asyncio.create_task(room.analyze_frame_with_vision(frame_bytes))
+                            asyncio.create_task(room.analyze_frame_with_vision(frame_bytes, participant_id))
+
+                    elif msg_type == "set_mood":
+                        room.mood = data.get("mood", "sentimental")
+                        logger.info(f"Room {room_id}: mood set to '{room.mood}'")
+                        await room._broadcast({"type": "mood_set", "mood": room.mood})
+
+                    elif msg_type == "photo_capture":
+                        frame_b64 = data.get("data", "")
+                        if frame_b64:
+                            ts = room.get_formatted_time()
+                            screenshot = {
+                                "data": frame_b64,
+                                "mime_type": "image/jpeg",
+                                "participant": participant_id,
+                                "timestamp": ts,
+                                "description": "User-captured moment",
+                            }
+                            async with room._state_lock:
+                                room.screenshots.append(screenshot)
+                            idx = len(room.screenshots)
+                            logger.info(f"Room {room_id}: photo #{idx} captured by {participant_id}")
+                            # Notify frontend the capture was saved
+                            await websocket.send_text(json.dumps({
+                                "type": "photo_saved",
+                                "index": idx,
+                                "timestamp": ts,
+                            }))
+                            # Kick off background stylization
+                            task = asyncio.create_task(
+                                _stylize_in_background(room, frame_b64, idx)
+                            )
+                            room._stylize_tasks.append(task)
+
+                    elif msg_type == "narrator_prompt":
+                        prompt = (data.get("text") or "").strip()
+                        if prompt:
+                            asyncio.create_task(
+                                room.narrate_storybook_prompt(prompt, participant_id)
+                            )
 
                     elif msg_type == "ping":
                         await websocket.send_text(json.dumps({"type": "pong"}))
 
                 except json.JSONDecodeError:
                     pass
+                except Exception as e:
+                    logger.warning(
+                        f"Room {room_id}: Ignoring malformed client message from "
+                        f"{participant_id}: {e}"
+                    )
 
     except WebSocketDisconnect:
         logger.info(f"WS disconnected: room={room_id} participant={participant_id}")
@@ -856,7 +1249,7 @@ async def ready():
         "ready": True,
         "gemini_configured": gemini_client is not None,
         "vision_configured": vision_client is not None,
-        "elevenlabs_configured": ELEVENLABS_API_KEY is not None,
+        "gradium_configured": GRADIUM_API_KEY is not None,
     }
 
 
@@ -904,6 +1297,8 @@ def _get_room_data(room_id: str) -> dict | None:
             "lang_a": r.lang_a,
             "lang_b": r.lang_b,
             "captions": r.captions,
+            "stylized_images": r.stylized_images,
+            "mood": r.mood,
             "active": True,
         }
     if room_id in closed_rooms:
@@ -917,6 +1312,8 @@ def _get_room_data(room_id: str) -> dict | None:
             "lang_a": d["lang_a"],
             "lang_b": d["lang_b"],
             "captions": d["captions"],
+            "stylized_images": d.get("stylized_images", []),
+            "mood": d.get("mood", "sentimental"),
             "active": False,
         }
     return None
@@ -972,6 +1369,21 @@ async def room_captions(room_id: str):
     }
 
 
+@app.post("/api/rooms/{room_id}/mood")
+async def set_room_mood(room_id: str, body: dict = None):
+    """Set the mood for a room (sentimental or funny)."""
+    if body is None:
+        body = {}
+    mood = body.get("mood", "sentimental")
+    if mood not in ("sentimental", "funny"):
+        return JSONResponse({"error": "mood must be 'sentimental' or 'funny'"}, status_code=400)
+    if room_id in rooms:
+        rooms[room_id].mood = mood
+    if room_id in closed_rooms:
+        closed_rooms[room_id]["mood"] = mood
+    return {"room_id": room_id, "mood": mood}
+
+
 @app.post("/api/rooms/{room_id}/seed")
 async def seed_room(room_id: str, body: dict = None):
     """Seed a room with pre-built data (screenshots, snippets, scenes) for demo purposes.
@@ -997,9 +1409,18 @@ async def seed_room(room_id: str, body: dict = None):
     for ss in body.get("screenshots", []):
         room.screenshots.append({
             "data": ss.get("data", ""),
+            "mime_type": ss.get("mime_type", "image/jpeg"),
             "participant": "seed",
             "timestamp": ss.get("timestamp", room.get_formatted_time()),
             "description": ss.get("description", "Seeded frame"),
+        })
+
+    for simg in body.get("stylized_images", []):
+        room.stylized_images.append({
+            "data": simg.get("data", ""),
+            "mime_type": simg.get("mime_type", "image/png"),
+            "index": simg.get("index", len(room.stylized_images) + 1),
+            "mood": simg.get("mood", room.mood),
         })
 
     for vs in body.get("voice_snippets", []):
@@ -1011,8 +1432,15 @@ async def seed_room(room_id: str, body: dict = None):
     for cap in body.get("captions", []):
         room.captions.append(cap)
 
+    if "mood" in body:
+        room.mood = body["mood"]
+
+    if "participant_names" in body:
+        room.participant_history = body["participant_names"]
+    elif "participants" in body and isinstance(body["participants"], list):
+        room.participant_history = [str(p) for p in body["participants"]]
+
     # Also archive immediately so it's available on the memories page
-    # even without an active WebSocket session
     _archive_room(room)
 
     return {
@@ -1022,6 +1450,7 @@ async def seed_room(room_id: str, body: dict = None):
         "voice_snippets": len(room.voice_snippets),
         "scene_descriptions": len(room.scene_descriptions),
         "captions": len(room.captions),
+        "mood": room.mood,
     }
 
 
@@ -1043,19 +1472,26 @@ async def create_storybook(room_id: str):
     }
 
     num_screenshots = len(data["screenshots"])
-    log_api_call("gemini_flash_image_input", num_screenshots * 0.001, f"Storybook input {room_id}")
+    if gemini_client:
+        log_api_call("gemini_flash_image_input", num_screenshots * 0.001, f"Storybook input {room_id}")
+        async with _gemini_sem:
+            pages = await generate_storybook(gemini_client, storybook_input)
+    else:
+        pages = await generate_storybook(None, storybook_input)
 
-    async with _gemini_sem:
-        pages = await generate_storybook(gemini_client, storybook_input)
     if not pages:
         return HTMLResponse("<h1>Failed to generate storybook</h1>", status_code=500)
     
     # Count generated images
     num_generated = sum(1 for p in pages if p["type"] == "image")
-    log_api_call("gemini_flash_image_output", num_generated, f"Storybook output {room_id}")
+    if gemini_client and num_generated:
+        log_api_call("gemini_flash_image_output", num_generated, f"Storybook output {room_id}")
 
     html = render_storybook_html(
-        pages, title=f"Our Moment Together ({data['duration']})"
+        pages,
+        title=f"Our Moment Together ({data['duration']})",
+        stylized_images=data.get("stylized_images", []),
+        mood=data.get("mood", "sentimental"),
     )
     return HTMLResponse(html)
 
@@ -1068,14 +1504,25 @@ async def create_memory_video(room_id: str):
     if not gemini_client:
         return JSONResponse({"error": "No Gemini client"}, status_code=500)
 
-    participants = ", ".join(data["participants"]) or "two loved ones"
-    num_screenshots = len(data["screenshots"])
+    participant_names = [str(p).split("_")[0] for p in data["participants"]]
+    participants = " and ".join(participant_names[:2]) or "two loved ones"
+    mood = data.get("mood", "sentimental")
+
+    # Use pre-stylized images if available; otherwise stylize first 2 screenshots
+    pre_stylized = data.get("stylized_images", [])
+    screenshots_for_video = data["screenshots"][:2] if data["screenshots"] else []
+    num_screenshots = len(screenshots_for_video)
     
-    # Log stylization cost
     log_api_call("gemini_flash_image_output", num_screenshots, f"Memory video stylization {room_id}")
 
     result = await run_memory_video_pipeline(
-        gemini_client, data["screenshots"], participants
+        gemini_client,
+        screenshots_for_video,
+        participants,
+        voice_snippets=data["voice_snippets"],
+        scene_descriptions=data["scene_descriptions"],
+        mood=mood,
+        pre_stylized=pre_stylized,
     )
     
     # Log video generation cost if video was created
@@ -1167,7 +1614,10 @@ async def _run_parallel_generation(task_id: str, room_id: str, data: dict):
                 pages = await generate_storybook(gemini_client, storybook_input)
             if pages:
                 html = render_storybook_html(
-                    pages, title=f"Our Moment Together ({data['duration']})"
+                    pages,
+                    title=f"Our Moment Together ({data['duration']})",
+                    stylized_images=data.get("stylized_images", []),
+                    mood=data.get("mood", "sentimental"),
                 )
                 task["storybook"] = {"status": "done", "html": html}
             else:
@@ -1182,9 +1632,17 @@ async def _run_parallel_generation(task_id: str, room_id: str, data: dict):
             if not gemini_client or not data["screenshots"]:
                 task["video"] = {"status": "empty"}
                 return
-            participants = ", ".join(data["participants"]) or "two loved ones"
+            participant_names = [str(p).split("_")[0] for p in data["participants"]]
+            participants = " and ".join(participant_names[:2]) or "two loved ones"
+            mood = data.get("mood", "sentimental")
             result = await run_memory_video_pipeline(
-                gemini_client, data["screenshots"], participants
+                gemini_client,
+                data["screenshots"][:2],
+                participants,
+                voice_snippets=data["voice_snippets"],
+                scene_descriptions=data["scene_descriptions"],
+                mood=mood,
+                pre_stylized=data.get("stylized_images", []),
             )
             video_data: dict = {
                 "status": "done",
@@ -1235,57 +1693,280 @@ async def memories_page(room_id: str):
 
 
 # ---------------------------------------------------------------------------
-# ElevenLabs fallback handler
+# Gradium fallback handler
+# Pipeline: Gradium STT → Gemini text translate → Gradium TTS (if supported)
 # ---------------------------------------------------------------------------
 async def _handle_fallback_audio(room: Room, audio_chunk: bytes, sender_id: str):
-    """Process audio through ElevenLabs STT → translate via Gemini text → ElevenLabs TTS."""
+    """Process audio through Gradium STT → Gemini text translation → Gradium TTS.
+
+    Gradium TTS is used only when the target language is supported (en/fr/es/de/pt).
+    For Mandarin, Hindi, and other languages Gemini doesn't produce an audio output
+    here — the transcript caption is still sent so the UI stays updated.
+    """
     try:
         room._mark_speaker(sender_id)
         room.last_speaker_id = sender_id
         room.last_speaker_ts = time.time()
 
-        text = await elevenlabs_stt(audio_chunk)
+        text = await gradium_stt(audio_chunk)
         if not text or not text.strip():
             return
 
-        # Use Gemini for text translation (cheaper than Live API)
+        # Determine sender / target languages
+        sender_lang = "Unknown"
+        for p in room.participants.values():
+            if p.participant_id == sender_id:
+                sender_lang = p.language
+                break
+        target_lang = room.lang_b if sender_lang == room.lang_a else room.lang_a
+
+        # Translate via Gemini text API (far cheaper than Live API per call)
         translated = text
         if gemini_client:
-            sender_lang = "Unknown"
-            for p in room.participants.values():
-                if p.participant_id == sender_id:
-                    sender_lang = p.language
-                    break
-
-            target_lang = room.lang_b if sender_lang == room.lang_a else room.lang_a
-
             try:
                 translate_resp = await gemini_client.aio.models.generate_content(
                     model="gemini-2.5-flash-lite",
-                    contents=f"Translate from {sender_lang} to {target_lang}. "
-                             f"Return ONLY the translation:\n\n{text}",
+                    contents=(
+                        f"Translate the following from {sender_lang} to {target_lang}. "
+                        f"Return ONLY the translated text, nothing else:\n\n{text}"
+                    ),
                 )
                 translated = translate_resp.text.strip() if translate_resp.text else text
             except Exception as te:
-                logger.warning(f"Gemini text translation failed, passing raw: {te}")
-                translated = text
+                logger.warning(f"Gemini text translation failed in fallback, using original: {te}")
 
-        await room._broadcast({
+        target_id = room._peer_id(sender_id)
+
+        # Send translated caption to listener
+        translated_caption = {
             "type": "caption",
             "text": translated,
-        }, exclude=sender_id)
+            "speaker": sender_id,
+            "side": "theirs",
+        }
+        async with room._state_lock:
+            room.captions.append(translated_caption)
+        await room._send_to_target_or_all(translated_caption, target_id)
 
-        tts_audio = await elevenlabs_tts(translated)
-        if tts_audio:
-            audio_b64 = base64.b64encode(tts_audio).decode()
-            await room._broadcast({
-                "type": "audio",
-                "data": audio_b64,
-                "mime_type": "audio/pcm;rate=16000",
-            }, exclude=sender_id)
+        # Send original transcript caption back to speaker
+        if sender_id in room.participants:
+            try:
+                await room.participants[sender_id].ws.send_text(
+                    json.dumps({
+                        "type": "caption",
+                        "text": text,
+                        "speaker": sender_id,
+                        "side": "mine",
+                    })
+                )
+            except Exception:
+                pass
+
+        # Gradium TTS — only for supported output languages
+        if target_lang.lower() in _GRADIUM_SUPPORTED:
+            tts_audio = await gradium_tts(translated, language=target_lang)
+            if tts_audio:
+                audio_b64 = base64.b64encode(tts_audio).decode()
+                await room._send_to_target_or_all({
+                    "type": "audio",
+                    "data": audio_b64,
+                    "mime_type": "audio/pcm;rate=16000",
+                }, target_id)
+                logger.info(f"Gradium TTS delivered {len(tts_audio)} PCM bytes → {target_lang}")
+        else:
+            logger.info(
+                f"Gradium TTS skipped (target lang '{target_lang}' not supported); "
+                f"caption sent as text-only fallback."
+            )
 
     except Exception as e:
-        logger.error(f"Fallback audio handler error: {e}")
+        logger.error(f"Gradium fallback handler error: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Demo route — seeds the grandma/granddaughter story and redirects to memories
+# ---------------------------------------------------------------------------
+def _png_chunk(chunk_type: bytes, payload: bytes) -> bytes:
+    return (
+        struct.pack("!I", len(payload))
+        + chunk_type
+        + payload
+        + struct.pack("!I", zlib.crc32(chunk_type + payload) & 0xFFFFFFFF)
+    )
+
+
+def _make_gradient_png_b64(
+    width: int,
+    height: int,
+    top_rgb: tuple[int, int, int],
+    bottom_rgb: tuple[int, int, int],
+) -> str:
+    """Generate a simple RGB gradient PNG and return base64 payload."""
+    rows = bytearray()
+    den = max(1, height - 1)
+    for y in range(height):
+        t = y / den
+        r = int(top_rgb[0] * (1 - t) + bottom_rgb[0] * t)
+        g = int(top_rgb[1] * (1 - t) + bottom_rgb[1] * t)
+        b = int(top_rgb[2] * (1 - t) + bottom_rgb[2] * t)
+        rows.append(0)  # filter type: None
+        rows.extend(bytes((r, g, b)) * width)
+
+    ihdr = struct.pack("!IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    idat = zlib.compress(bytes(rows), level=9)
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", ihdr)
+        + _png_chunk(b"IDAT", idat)
+        + _png_chunk(b"IEND", b"")
+    )
+    return base64.b64encode(png).decode("ascii")
+
+
+_DEMO_VOICE_SNIPPETS = [
+    {"text": "我想你了，小梅。每天都想你。", "translation": "I miss you so much, little Mei. I think of you every single day.", "timestamp": "00:01", "speaker": "Nǎi Nai", "emotion": "longing"},
+    {"text": "吃饭了吗？你在那边一定要好好吃饭。", "translation": "Have you eaten? You must take care of yourself over there.", "timestamp": "00:03", "speaker": "Nǎi Nai", "emotion": "warmth"},
+    {"text": "Nai Nai, I'm eating your dumplings right now. I made them from the recipe you wrote me.", "translation": "奶奶，我正在吃你包的饺子。我用你写给我的食谱做的。", "timestamp": "00:05", "speaker": "Mei", "emotion": "joy"},
+    {"text": "真的？你包的一定很好吃。你奶奶我教出来的！", "translation": "Really? They must taste wonderful. After all, I taught you!", "timestamp": "00:06", "speaker": "Nǎi Nai", "emotion": "pride"},
+    {"text": "我给你看看我家门口的花，今年开得特别好。", "translation": "Let me show you the flowers by my door — they're especially beautiful this year.", "timestamp": "00:09", "speaker": "Nǎi Nai", "emotion": "joy"},
+    {"text": "Oh, Nai Nai, they're gorgeous. Are those from Grandpa's garden?", "translation": "哇，奶奶，真漂亮。那是爷爷花园里的那些花吗？", "timestamp": "00:10", "speaker": "Mei", "emotion": "nostalgia"},
+    {"text": "对，就是他种的那些。他要是看到你现在这么出息，一定很骄傲。", "translation": "Yes, the ones he planted. If he could see how well you've done, he'd be so proud.", "timestamp": "00:11", "speaker": "Nǎi Nai", "emotion": "bittersweet"},
+    {"text": "I love you, Nai Nai. I'll come home soon.", "translation": "我爱你，奶奶。我很快就回家。", "timestamp": "00:14", "speaker": "Mei", "emotion": "love"},
+    {"text": "我爱你，小梅。路上小心。奶奶在这里等你。", "translation": "I love you too, little Mei. Travel safe. Grandma will be right here waiting.", "timestamp": "00:15", "speaker": "Nǎi Nai", "emotion": "love"},
+]
+
+_DEMO_SCENE_DESCRIPTIONS = [
+    {"timestamp": "00:02", "description": "An elderly woman's face glows warmly in a Beijing apartment. Faded red paper cuttings hang on the window behind her. A teapot steams on the table. Afternoon light filters through sheer curtains.", "labels": ["indoor", "warm", "Beijing", "traditional"]},
+    {"timestamp": "00:05", "description": "A young woman holds up a plate of freshly made dumplings toward the camera in a New York studio apartment. She's smiling, flour still on her hands. A handwritten recipe card is visible on the counter.", "labels": ["food", "cooking", "joy", "New York"]},
+    {"timestamp": "00:09", "description": "The grandmother points her phone at red and pink roses blooming beside a wooden gate opening onto a narrow Beijing hutong alley. Morning light catches the petals.", "labels": ["outdoor", "flowers", "garden", "Beijing"]},
+    {"timestamp": "00:12", "description": "The grandmother holds up a framed photograph — a younger version of herself standing with a man in a garden. She points to the flowers in the background, which match the roses she just showed.", "labels": ["portrait", "memory", "family", "nostalgia"]},
+    {"timestamp": "00:15", "description": "Both screens in split view: Nǎi Nai pressing her palm to the camera glass in Beijing, and Mei pressing hers in New York. Two palms, one connection, six thousand miles apart.", "labels": ["gesture", "connection", "emotional", "farewell"]},
+]
+
+_DEMO_CAPTIONS = [
+    {"text": "I miss you so much, little Mei. I think of you every single day.", "side": "theirs"},
+    {"text": "Have you eaten? You must take care of yourself over there.", "side": "theirs"},
+    {"text": "Nai Nai, I'm eating your dumplings right now!", "side": "mine"},
+    {"text": "Really? They must taste wonderful. After all, I taught you!", "side": "theirs"},
+    {"text": "Let me show you the flowers by my door — they're especially beautiful this year.", "side": "theirs"},
+    {"text": "Oh Nai Nai, they're gorgeous. Are those from Grandpa's garden?", "side": "mine"},
+    {"text": "Yes. If he could see how well you've done, he'd be so proud.", "side": "theirs"},
+    {"text": "I love you, Nai Nai. I'll come home soon.", "side": "mine"},
+    {"text": "I love you too, little Mei. Grandma will be right here waiting.", "side": "theirs"},
+]
+
+_DEMO_SCREENSHOTS = [
+    {
+        "data": _make_gradient_png_b64(640, 360, (35, 24, 28), (152, 108, 84)),
+        "mime_type": "image/png",
+        "timestamp": "00:02",
+        "description": _DEMO_SCENE_DESCRIPTIONS[0]["description"],
+    },
+    {
+        "data": _make_gradient_png_b64(640, 360, (28, 40, 58), (194, 146, 112)),
+        "mime_type": "image/png",
+        "timestamp": "00:08",
+        "description": _DEMO_SCENE_DESCRIPTIONS[2]["description"],
+    },
+    {
+        "data": _make_gradient_png_b64(640, 360, (22, 20, 30), (132, 86, 120)),
+        "mime_type": "image/png",
+        "timestamp": "00:14",
+        "description": _DEMO_SCENE_DESCRIPTIONS[4]["description"],
+    },
+]
+
+
+def _seed_grandma_demo_room(room: Room) -> bool:
+    """Populate demo room artifacts for memory/storybook/video demo."""
+    changed = False
+    room.lang_a = "Mandarin Chinese"
+    room.lang_b = "English"
+    room.mood = "sentimental"
+
+    if not room.voice_snippets:
+        room.voice_snippets.extend(_DEMO_VOICE_SNIPPETS)
+        changed = True
+    if not room.scene_descriptions:
+        room.scene_descriptions.extend(_DEMO_SCENE_DESCRIPTIONS)
+        changed = True
+    if not room.captions:
+        room.captions.extend(_DEMO_CAPTIONS)
+        changed = True
+    if not room.screenshots:
+        room.screenshots.extend([{**ss, "participant": "seed"} for ss in _DEMO_SCREENSHOTS])
+        changed = True
+    if not room.stylized_images:
+        room.stylized_images.extend([
+            {
+                "data": ss["data"],
+                "mime_type": ss.get("mime_type", "image/png"),
+                "index": i + 1,
+                "mood": "sentimental",
+            }
+            for i, ss in enumerate(_DEMO_SCREENSHOTS[:2])
+        ])
+        changed = True
+    if not room.participant_history:
+        room.participant_history = ["Nǎi Nai", "Mei"]
+        changed = True
+
+    if changed:
+        _archive_room(room)
+    return changed
+
+
+@app.get("/demo/live")
+async def demo_live_redirect():
+    """Separate URL for live translation demo."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/?room=live-demo", status_code=302)
+
+
+@app.get("/demo")
+async def demo_redirect():
+    """Legacy demo URL: redirects to memory demo."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/demo/memory", status_code=302)
+
+
+@app.get("/demo/memory")
+async def demo_memory_redirect():
+    """Separate URL for memory/storybook/video demo."""
+    from fastapi.responses import RedirectResponse
+    room_id = "grandma-demo"
+    room = get_or_create_room(room_id, "Mandarin Chinese", "English")
+    changed = _seed_grandma_demo_room(room)
+    if changed:
+        logger.info(
+            f"Demo room '{room_id}' seeded with "
+            f"{len(room.voice_snippets)} voice moments and {len(room.screenshots)} screenshots"
+        )
+
+    return RedirectResponse(url=f"/room/{room_id}/memories", status_code=302)
+
+
+@app.post("/api/demo/reseed")
+async def demo_reseed():
+    """Re-seed the demo room (clears existing data first)."""
+    room_id = "grandma-demo"
+    if room_id in rooms:
+        del rooms[room_id]
+    if room_id in closed_rooms:
+        del closed_rooms[room_id]
+
+    room = get_or_create_room(room_id, "Mandarin Chinese", "English")
+    _seed_grandma_demo_room(room)
+
+    return {
+        "status": "reseeded",
+        "room_id": room_id,
+        "memories_url": f"/room/{room_id}/memories",
+        "live_url": "/demo/live",
+        "voice_snippets": len(room.voice_snippets),
+        "scenes": len(room.scene_descriptions),
+        "screenshots": len(room.screenshots),
+    }
 
 
 # Static files (must be last)
