@@ -665,6 +665,46 @@
             opacity: 1;
         }
 
+        /* ── Remote Camera PiP (bottom-left) ── */
+        .remote-cam-pip {
+            position: fixed;
+            bottom: 82px;
+            left: 12px;
+            width: 220px;
+            height: 165px;
+            z-index: 15;
+            display: none;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(100, 180, 255, 0.2);
+        }
+
+        .remote-cam-pip canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+        }
+
+        .remote-cam-pip .remote-label {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.62rem;
+            color: rgba(255, 255, 255, 0.85);
+            background: rgba(0, 0, 0, 0.55);
+            padding: 2px 7px;
+            border-radius: 6px;
+            z-index: 3;
+            pointer-events: none;
+            white-space: nowrap;
+            letter-spacing: 0.02em;
+        }
+
         /* ── Visual moment entry (key vision/sentiment) ── */
         .transcript-entry.visual-moment .text {
             font-family: 'DM Sans', sans-serif;
@@ -892,6 +932,12 @@
         <div class="scene-label" id="sceneLabel"></div>
     </div>
 
+    <!-- Remote participant camera feed (JPEG frames from server relay) -->
+    <div class="remote-cam-pip" id="remoteCamPip">
+        <canvas id="remoteVideo" width="320" height="240"></canvas>
+        <div class="remote-label" id="remoteLabel">Them</div>
+    </div>
+
     <div class="audio-level">
         <div class="audio-level-bar" id="audioLevelBar"></div>
     </div>
@@ -1099,6 +1145,9 @@
                     capBtn.style.boxShadow = '0 0 12px rgba(232,165,75,0.4)';
                     setTimeout(() => capBtn.style.boxShadow = '', 1500);
                     break;
+                case 'remote_frame':
+                    showRemoteFrame(msg.data, msg.participant_id);
+                    break;
                 case 'error':
                     console.error('Server:', msg.message);
                     showToast(msg.message || 'Error');
@@ -1121,6 +1170,37 @@
             lastSentimentTs = now;
             const label = SENT_LABELS[emotion] || emotion;
             addVisualEntry('right', `${label} detected`);
+        }
+
+        /* ── Remote camera frame renderer ── */
+        let remoteFrameHideTimer = null;
+        function showRemoteFrame(base64jpeg, participantId) {
+            const pip = document.getElementById('remoteCamPip');
+            const canvas = document.getElementById('remoteVideo');
+            const label = document.getElementById('remoteLabel');
+
+            // Update label with the remote participant's display name
+            if (participantId) {
+                label.textContent = participantId.split('_')[0];
+            }
+
+            // Reveal the PiP if it's hidden
+            if (pip.style.display !== 'block') pip.style.display = 'block';
+
+            // Draw the received JPEG onto the canvas
+            const img = new Image();
+            img.onload = function () {
+                canvas.width = img.naturalWidth || 320;
+                canvas.height = img.naturalHeight || 240;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+            };
+            img.src = 'data:image/jpeg;base64,' + base64jpeg;
+
+            // Auto-hide if frames stop arriving for 3 s (camera turned off)
+            if (remoteFrameHideTimer) clearTimeout(remoteFrameHideTimer);
+            remoteFrameHideTimer = setTimeout(() => {
+                pip.style.display = 'none';
+            }, 3000);
         }
 
         /* ── Bridge animation ── */
