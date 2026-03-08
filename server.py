@@ -2164,21 +2164,39 @@ async def create_memory_video(room_id: str):
     participants = " and ".join(participant_names[:2]) or "two loved ones"
     mood = data.get("mood", "sentimental")
 
-    # Use pre-stylized images if available; otherwise stylize first 2 screenshots
+    # Build context string for Veo prompt from available data
+    snippets_text = " ".join(
+        s.get("text", "") for s in data["voice_snippets"][:3]
+        if isinstance(s, dict)
+    )
+    scene_text = " ".join(
+        s.get("description", "") for s in data["scene_descriptions"][:3]
+        if isinstance(s, dict)
+    )
+    context = f"A {mood} memory between {participants}."
+    if scene_text:
+        context += f" Scenes: {scene_text}."
+    if snippets_text:
+        context += f" They said: {snippets_text[:200]}"
+
+    # Use pre-stylized images if available; otherwise stylize screenshots
     pre_stylized = data.get("stylized_images", [])
-    screenshots_for_video = data["screenshots"][:2] if data["screenshots"] else []
-    num_screenshots = len(screenshots_for_video)
-    
-    log_api_call("gemini_flash_image_output", num_screenshots, f"Memory video stylization {room_id}")
+    if pre_stylized:
+        images_to_use = pre_stylized
+        skip_stylize = True
+    else:
+        images_to_use = data.get("screenshots", [])[:5]
+        skip_stylize = False
+
+    num_screenshots = len(images_to_use)
+    if not skip_stylize:
+        log_api_call("gemini_flash_image_output", num_screenshots, f"Memory video stylization {room_id}")
 
     result = await run_memory_video_pipeline(
         gemini_client,
-        screenshots_for_video,
-        participants,
-        voice_snippets=data["voice_snippets"],
-        scene_descriptions=data["scene_descriptions"],
-        mood=mood,
-        pre_stylized=pre_stylized,
+        images_to_use,
+        context=context,
+        skip_stylize=skip_stylize,
     )
     
     # Log video generation cost if video was created
@@ -2314,14 +2332,36 @@ async def _run_parallel_generation(task_id: str, room_id: str, data: dict):
             participant_names = [str(p).split("_")[0] for p in data["participants"]]
             participants = " and ".join(participant_names[:2]) or "two loved ones"
             mood = data.get("mood", "sentimental")
+
+            # Build context string for Veo prompt from available data
+            snippets_text = " ".join(
+                s.get("text", "") for s in data["voice_snippets"][:3]
+                if isinstance(s, dict)
+            )
+            scene_text = " ".join(
+                s.get("description", "") for s in data["scene_descriptions"][:3]
+                if isinstance(s, dict)
+            )
+            context = f"A {mood} memory between {participants}."
+            if scene_text:
+                context += f" Scenes: {scene_text}."
+            if snippets_text:
+                context += f" They said: {snippets_text[:200]}"
+
+            # Use pre-stylized images if available, otherwise pass screenshots
+            pre_stylized = data.get("stylized_images", [])
+            if pre_stylized:
+                images_to_use = pre_stylized
+                skip_stylize = True
+            else:
+                images_to_use = data["screenshots"][:5]
+                skip_stylize = False
+
             result = await run_memory_video_pipeline(
                 gemini_client,
-                data["screenshots"][:2],
-                participants,
-                voice_snippets=data["voice_snippets"],
-                scene_descriptions=data["scene_descriptions"],
-                mood=mood,
-                pre_stylized=data.get("stylized_images", []),
+                images_to_use,
+                context=context,
+                skip_stylize=skip_stylize,
             )
             video_data: dict = {
                 "status": "done",
