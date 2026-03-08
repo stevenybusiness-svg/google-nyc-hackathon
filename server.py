@@ -47,15 +47,17 @@ gemini_client = genai.Client(api_key=GOOGLE_API_KEY) if GOOGLE_API_KEY else None
 
 try:
     from google.api_core import client_options as client_options_lib
-    vision_opts = client_options_lib.ClientOptions(
-        quota_project_id=os.getenv("GOOGLE_CLOUD_PROJECT", "974516981471")
-    )
-    vision_client = vision.ImageAnnotatorClient(client_options=vision_opts)
+    _gcp_project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    if _gcp_project:
+        vision_opts = client_options_lib.ClientOptions(quota_project_id=_gcp_project)
+        vision_client = vision.ImageAnnotatorClient(client_options=vision_opts)
+    else:
+        vision_client = vision.ImageAnnotatorClient()
 except Exception as e:
     logger.warning(f"Failed to create Vision client: {e}")
     vision_client = None
 
-TRANSLATION_MODEL = "gemini-2.5-flash-native-audio-latest"
+TRANSLATION_MODEL = "gemini-2.0-flash-exp"
 
 # ---------------------------------------------------------------------------
 # ElevenLabs fallback (STT + TTS when Gemini is rate-limited or down)
