@@ -131,6 +131,34 @@
             margin: 2rem auto;
             display: block;
         }
+        .memory-reel {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            aspect-ratio: 16/9;
+            margin: 2rem auto;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            background: #111;
+        }
+        .memory-reel img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            animation: reelFade 12s linear infinite;
+            transform: scale(1.06);
+        }
+        @keyframes reelFade {
+            0% { opacity: 0; transform: scale(1.08); }
+            8% { opacity: 1; }
+            30% { opacity: 1; transform: scale(1.0); }
+            38% { opacity: 0; transform: scale(1.05); }
+            100% { opacity: 0; }
+        }
 
         /* ── Loading / progress ── */
         .loading {
@@ -414,6 +442,7 @@
             if (data.video) {
                 document.getElementById('videoLabel').style.display = 'block';
                 const player = document.getElementById('videoPlayer');
+                player.innerHTML = '';
                 const videoEl = document.createElement('video');
                 videoEl.className = 'memory-video';
                 videoEl.controls = true;
@@ -429,6 +458,8 @@
                 for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
                 videoBlob = new Blob([byteArr], { type: data.video.mime_type });
                 document.getElementById('downloadVideoBtn').style.display = 'inline-flex';
+            } else if (data.stylized_images && data.stylized_images.length > 0) {
+                renderFallbackReel(data.stylized_images);
             }
         } catch (e) {
             document.getElementById('videoLoading').style.display = 'none';
@@ -608,6 +639,7 @@
         if (videoTask.video) {
             document.getElementById('videoLabel').style.display = 'block';
             const player = document.getElementById('videoPlayer');
+            player.innerHTML = '';
             const videoEl = document.createElement('video');
             videoEl.className = 'memory-video';
             videoEl.controls = true; videoEl.autoplay = true; videoEl.loop = true;
@@ -618,7 +650,29 @@
             for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
             videoBlob = new Blob([byteArr], { type: videoTask.video.mime_type });
             document.getElementById('downloadVideoBtn').style.display = 'inline-flex';
+        } else if (videoTask.stylized_images && videoTask.stylized_images.length > 0) {
+            renderFallbackReel(videoTask.stylized_images);
         }
+    }
+
+    function renderFallbackReel(stylizedImages) {
+        const player = document.getElementById('videoPlayer');
+        const label = document.getElementById('videoLabel');
+        player.innerHTML = '';
+        label.style.display = 'block';
+        label.textContent = 'Memory Reel';
+        const reel = document.createElement('div');
+        reel.className = 'memory-reel';
+        const images = stylizedImages.slice(0, 4);
+        images.forEach((img, idx) => {
+            const el = document.createElement('img');
+            el.src = `data:${img.mime_type};base64,${img.data}`;
+            const cycle = Math.max(8, images.length * 3);
+            el.style.animationDuration = `${cycle}s`;
+            el.style.animationDelay = `${idx * (cycle / images.length)}s`;
+            reel.appendChild(el);
+        });
+        player.appendChild(reel);
     }
 
     function renderCaptions(captionsTask) {

@@ -8,12 +8,15 @@ Flow:
 import asyncio
 import base64
 import logging
+import os
 import time
 
 from google import genai
 from google.genai import types
 
 logger = logging.getLogger(__name__)
+STYLIZE_MODEL = os.getenv("MEMORY_STYLIZE_MODEL", "gemini-2.5-flash-image")
+MEMORY_VIDEO_MODEL = os.getenv("MEMORY_VIDEO_MODEL", "veo-2.0-generate-001")
 
 STYLIZE_PROMPT = """Transform this photograph into a warm, dreamlike, artistic illustration.
 
@@ -29,37 +32,60 @@ CONSTRAINTS:
 - No harsh lighting or shadows
 - Keep the emotional essence of the original scene
 - The result should feel like a treasured memory, not a photograph
+- Preserve expressive details (eyes, hands, posture) that communicate feeling
 """
 
-VIDEO_PROMPT_TEMPLATE = """Create a slow, contemplative video montage from these stylized memory images.
+VIDEO_PROMPT_SENTIMENTAL = """Create a slow, contemplative video montage from these stylized memory images.
 
-CONTEXT: These images are from a video call between {participants} — two loved ones separated by distance, connected through translation technology.
+CONTEXT: A video call between {participants} — loved ones separated by distance, connected through real-time translation.
+MOMENTS: {moments}
+SCENES: {scenes}
 
 STYLE:
-- Slow Ken Burns effect (gentle pan and zoom on each image)
-- Warm color grading throughout
-- Soft crossfade transitions between images
-- Contemplative, emotional pace
+- Slow Ken Burns effect (gentle pan and zoom)
+- Warm golden color grading
+- Soft crossfade transitions
 - The feeling of looking through a cherished photo album
+- Emotional arc: reunion warmth -> tenderness -> bittersweet longing -> hope
 
 MOOD: Love, warmth, nostalgia, connection despite distance
+Duration: ~8 seconds
+"""
 
+VIDEO_PROMPT_FUNNY = """Create a playful, energetic video montage from these cartoon-style images.
+
+CONTEXT: A chaotic, hilarious video call between {participants} — they meant to have a quick chat and it turned into an adventure.
+MOMENTS: {moments}
+SCENES: {scenes}
+
+STYLE:
+- Quick zoom-ins and playful camera shakes
+- Bright, saturated color grading
+- Pop-art transitions, wipe effects
+- Comic book energy — like a blooper reel
+- Punchline timing: setup -> buildup -> payoff
+
+MOOD: Joyful, absurd, laugh-out-loud friendship energy
 Duration: ~8 seconds
 """
 
 
-async def stylize_image(client: genai.Client, image_b64: str) -> dict | None:
+async def stylize_image(
+    client: genai.Client,
+    image_b64: str,
+    mime_type: str = "image/jpeg",
+) -> dict | None:
     """Stylize a single screenshot using Gemini image generation."""
     try:
         if isinstance(image_b64, bytes):
             image_b64 = base64.b64encode(image_b64).decode()
 
         response = await client.aio.models.generate_content(
-            model="gemini-2.5-flash-image",
+            model=STYLIZE_MODEL,
             contents=[
                 {
                     "inline_data": {
-                        "mime_type": "image/jpeg",
+                        "mime_type": mime_type or "image/jpeg",
                         "data": image_b64,
                     }
                 },
@@ -93,14 +119,16 @@ async def stylize_all_images(
     """Stylize multiple screenshots concurrently."""
     tasks = []
     for ss in screenshots[:max_images]:
+        mime = "image/jpeg"
         if isinstance(ss, dict):
             img_data = ss.get("data", "")
+            mime = ss.get("mime_type", "image/jpeg")
         elif isinstance(ss, str):
             img_data = ss
         else:
             continue
         if img_data:
-            tasks.append(stylize_image(client, img_data))
+            tasks.append(stylize_image(client, img_data, mime_type=mime))
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
     stylized = []
@@ -114,6 +142,9 @@ async def generate_memory_video(
     client: genai.Client,
     stylized_images: list[dict],
     participants: str = "two loved ones",
+    moments: str = "",
+    scenes: str = "",
+    mood: str = "sentimental",
 ) -> dict | None:
     """Generate a short memory video from stylized images using Veo."""
     if not stylized_images:
@@ -121,7 +152,12 @@ async def generate_memory_video(
         return None
 
     try:
-        prompt = VIDEO_PROMPT_TEMPLATE.format(participants=participants)
+        template = VIDEO_PROMPT_FUNNY if mood == "funny" else VIDEO_PROMPT_SENTIMENTAL
+        prompt = template.format(
+            participants=participants,
+            moments=moments or "No explicit quotes captured; infer from the visual context.",
+            scenes=scenes or "No scene notes captured; keep a warm intimate domestic tone.",
+        )
 
         image_part = stylized_images[0]
         img_bytes = image_part["data"]
@@ -140,7 +176,7 @@ async def generate_memory_video(
         logger.info(f"Generating video from {len(img_bytes)} bytes ({mime})")
 
         operation = await client.aio.models.generate_videos(
-            model="veo-2.0-generate-001",
+            model=MEMORY_VIDEO_MODEL,
             prompt=prompt,
             image=types.Image(
                 image_bytes=img_bytes,
@@ -189,21 +225,60 @@ async def run_memory_video_pipeline(
     client: genai.Client,
     screenshots: list[dict],
     participants: str = "two loved ones",
+    voice_snippets: list | None = None,
+    scene_descriptions: list | None = None,
+    mood: str = "sentimental",
+    pre_stylized: list | None = None,
 ) -> dict:
-    """Full pipeline: stylize → generate video. Returns result dict."""
+    """Full pipeline: stylize → generate video. Returns result dict.
+    
+    If pre_stylized images are provided (from background processing), skip stylization.
+    Uses first 2 screenshots for Veo input.
+    """
     result = {
         "stylized_images": [],
         "video": None,
     }
 
-    logger.info(f"Stylizing {len(screenshots)} screenshots...")
-    stylized = await stylize_all_images(client, screenshots)
+    if pre_stylized:
+        logger.info(f"Using {len(pre_stylized)} pre-stylized images")
+        stylized = pre_stylized
+    else:
+        logger.info(f"Stylizing {len(screenshots)} screenshots...")
+        stylized = await stylize_all_images(client, screenshots)
     result["stylized_images"] = stylized
-    logger.info(f"Stylized {len(stylized)} images")
+    logger.info(f"Have {len(stylized)} stylized images for video")
 
     if stylized:
-        logger.info("Generating memory video...")
-        video = await generate_memory_video(client, stylized, participants)
+        moment_lines = []
+        if isinstance(voice_snippets, list):
+            for s in voice_snippets[:4]:
+                if not isinstance(s, dict):
+                    continue
+                text = s.get("translation") or s.get("text")
+                if not text:
+                    continue
+                speaker = s.get("speaker", "speaker")
+                moment_lines.append(f'- {speaker}: "{text}"')
+
+        scene_lines = []
+        if isinstance(scene_descriptions, list):
+            for s in scene_descriptions[:3]:
+                if not isinstance(s, dict):
+                    continue
+                desc = s.get("description")
+                if desc:
+                    scene_lines.append(f"- {desc}")
+
+        logger.info(f"Generating memory video (mood={mood})...")
+        video = await generate_memory_video(
+            client,
+            stylized,
+            participants,
+            moments="\n".join(moment_lines),
+            scenes="\n".join(scene_lines),
+            mood=mood,
+        )
         result["video"] = video
         if video:
             logger.info("Memory video generated successfully")
