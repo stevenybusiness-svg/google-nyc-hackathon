@@ -1,14 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>在一起 — Call</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Fraunces:wght@300;400;600&family=Noto+Sans+SC:wght@300;400&family=Noto+Sans+Devanagari:wght@300;400&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Fraunces:wght@300;400;600&family=Noto+Sans+SC:wght@300;400&family=Noto+Sans+Devanagari:wght@300;400&display=swap"
+        rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { height: 100%; overflow: hidden; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
             font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'Noto Sans Devanagari', sans-serif;
             background: #0e0e12;
@@ -17,37 +30,96 @@
 
         /* ── Top bar ── */
         .topbar {
-            position: fixed; top: 0; left: 0; right: 0; height: 48px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 48px;
             padding: 0 1.5rem;
-            display: flex; justify-content: space-between; align-items: center;
-            background: rgba(14,14,18,0.92);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(14, 14, 18, 0.92);
             backdrop-filter: blur(12px);
             z-index: 20;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         }
-        .topbar-left { display: flex; align-items: center; gap: 1rem; }
-        .room-info { font-size: 0.82rem; color: #8a8278; }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .room-info {
+            font-size: 0.82rem;
+            color: #8a8278;
+        }
+
         .call-timer {
-            font-size: 0.82rem; color: #b0a898;
+            font-size: 0.82rem;
+            color: #b0a898;
             font-variant-numeric: tabular-nums;
             font-family: 'SF Mono', 'Menlo', monospace;
         }
-        .topbar-right { display: flex; align-items: center; gap: 0.7rem; }
-        .status {
-            font-size: 0.72rem; padding: 0.2rem 0.6rem; border-radius: 16px;
-            background: rgba(28,28,32,0.7); border: 1px solid rgba(255,255,255,0.08);
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
         }
-        .status.connected { border-color: #4caf50; color: #4caf50; }
-        .status.connected::before { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #4caf50; margin-right: 5px; animation: blink 2s infinite; }
-        .status.connecting { border-color: #ff9800; color: #ff9800; }
-        @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+        .status {
+            font-size: 0.72rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 16px;
+            background: rgba(28, 28, 32, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .status.connected {
+            border-color: #4caf50;
+            color: #4caf50;
+        }
+
+        .status.connected::before {
+            content: '';
+            display: inline-block;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #4caf50;
+            margin-right: 5px;
+            animation: blink 2s infinite;
+        }
+
+        .status.connecting {
+            border-color: #ff9800;
+            color: #ff9800;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
 
         /* ── Book layout ── */
         .book {
             position: fixed;
-            top: 48px; bottom: 72px; left: 0; right: 0;
+            top: 48px;
+            bottom: 72px;
+            left: 0;
+            right: 0;
             display: flex;
         }
+
         .page {
             flex: 1;
             display: flex;
@@ -55,56 +127,71 @@
             overflow: hidden;
             position: relative;
         }
+
         .page-left {
-            background: linear-gradient(135deg, rgba(22,20,18,0.95) 0%, rgba(18,16,14,0.98) 100%);
-            border-right: 1px solid rgba(255,255,255,0.04);
+            background: linear-gradient(135deg, rgba(22, 20, 18, 0.95) 0%, rgba(18, 16, 14, 0.98) 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.04);
         }
+
         .page-right {
-            background: linear-gradient(225deg, rgba(22,20,18,0.95) 0%, rgba(18,16,14,0.98) 100%);
-            border-left: 1px solid rgba(255,255,255,0.04);
+            background: linear-gradient(225deg, rgba(22, 20, 18, 0.95) 0%, rgba(18, 16, 14, 0.98) 100%);
+            border-left: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         /* Living bridge */
         .bridge {
             width: 52px;
             background: linear-gradient(180deg,
-                rgba(191,155,120,0.03) 0%,
-                rgba(191,155,120,0.10) 20%,
-                rgba(191,155,120,0.14) 50%,
-                rgba(191,155,120,0.10) 80%,
-                rgba(191,155,120,0.03) 100%);
+                    rgba(191, 155, 120, 0.03) 0%,
+                    rgba(191, 155, 120, 0.10) 20%,
+                    rgba(191, 155, 120, 0.14) 50%,
+                    rgba(191, 155, 120, 0.10) 80%,
+                    rgba(191, 155, 120, 0.03) 100%);
             position: relative;
             flex-shrink: 0;
-            overflow: hidden;
+            overflow: visible;
             animation: bridgePulse 4s ease-in-out infinite;
         }
+
         .bridge::before {
             content: '';
             position: absolute;
-            top: 0; bottom: 0; left: 50%;
+            top: 0;
+            bottom: 0;
+            left: 50%;
             width: 2px;
             transform: translateX(-50%);
             background: linear-gradient(180deg,
-                transparent 0%,
-                rgba(191,155,120,0.35) 30%,
-                rgba(191,155,120,0.35) 70%,
-                transparent 100%);
+                    transparent 0%,
+                    rgba(191, 155, 120, 0.35) 30%,
+                    rgba(191, 155, 120, 0.35) 70%,
+                    transparent 100%);
         }
+
         .bridge::after {
             content: '';
             position: absolute;
             inset: 0;
             background: radial-gradient(ellipse at 50% 50%,
-                rgba(191,155,120,var(--bridge-glow, 0.04)) 0%,
-                transparent 70%);
+                    rgba(191, 155, 120, var(--bridge-glow, 0.04)) 0%,
+                    transparent 70%);
             transition: opacity 0.4s;
         }
+
         .bridge.active::after {
             --bridge-glow: 0.18;
         }
+
         @keyframes bridgePulse {
-            0%, 100% { --bridge-glow: 0.04; }
-            50% { --bridge-glow: 0.08; }
+
+            0%,
+            100% {
+                --bridge-glow: 0.04;
+            }
+
+            50% {
+                --bridge-glow: 0.08;
+            }
         }
 
         /* Bridge particles */
@@ -113,33 +200,69 @@
             left: 50%;
             transform: translateX(-50%);
             font-size: 0.58rem;
-            color: rgba(191,155,120,0.85);
+            color: rgba(191, 155, 120, 0.85);
             white-space: nowrap;
             max-width: 48px;
             overflow: hidden;
             text-overflow: ellipsis;
             pointer-events: none;
             z-index: 2;
-            text-shadow: 0 0 8px rgba(191,155,120,0.5);
+            text-shadow: 0 0 8px rgba(191, 155, 120, 0.5);
             font-family: 'Fraunces', serif;
         }
+
         .bridge-particle.crossing-right {
             animation: crossRight 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
         }
+
         .bridge-particle.crossing-left {
             animation: crossLeft 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
         }
+
         @keyframes crossRight {
-            0% { top: 30%; opacity: 0; transform: translateX(-50%) scale(0.7); }
-            20% { opacity: 1; transform: translateX(-50%) scale(1); }
-            80% { opacity: 1; }
-            100% { top: 70%; opacity: 0; transform: translateX(-50%) scale(0.7); }
+            0% {
+                top: 30%;
+                opacity: 0;
+                transform: translateX(-50%) scale(0.7);
+            }
+
+            20% {
+                opacity: 1;
+                transform: translateX(-50%) scale(1);
+            }
+
+            80% {
+                opacity: 1;
+            }
+
+            100% {
+                top: 70%;
+                opacity: 0;
+                transform: translateX(-50%) scale(0.7);
+            }
         }
+
         @keyframes crossLeft {
-            0% { top: 70%; opacity: 0; transform: translateX(-50%) scale(0.7); }
-            20% { opacity: 1; transform: translateX(-50%) scale(1); }
-            80% { opacity: 1; }
-            100% { top: 30%; opacity: 0; transform: translateX(-50%) scale(0.7); }
+            0% {
+                top: 70%;
+                opacity: 0;
+                transform: translateX(-50%) scale(0.7);
+            }
+
+            20% {
+                opacity: 1;
+                transform: translateX(-50%) scale(1);
+            }
+
+            80% {
+                opacity: 1;
+            }
+
+            100% {
+                top: 30%;
+                opacity: 0;
+                transform: translateX(-50%) scale(0.7);
+            }
         }
 
         /* Bridge connection dots */
@@ -147,31 +270,44 @@
             position: absolute;
             left: 50%;
             transform: translateX(-50%);
-            width: 4px; height: 4px;
+            width: 4px;
+            height: 4px;
             border-radius: 50%;
-            background: rgba(191,155,120,0.3);
+            background: rgba(191, 155, 120, 0.3);
         }
-        .bridge-dot.top { top: 15%; }
-        .bridge-dot.bottom { bottom: 15%; }
-        .bridge-dot.active { background: rgba(191,155,120,0.7); box-shadow: 0 0 6px rgba(191,155,120,0.4); }
+
+        .bridge-dot.top {
+            top: 15%;
+        }
+
+        .bridge-dot.bottom {
+            bottom: 15%;
+        }
+
+        .bridge-dot.active {
+            background: rgba(191, 155, 120, 0.7);
+            box-shadow: 0 0 6px rgba(191, 155, 120, 0.4);
+        }
 
         /* Page headers */
         .page-header {
             padding: 1rem 1.5rem 0.6rem;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             flex-shrink: 0;
         }
+
         .page-title {
             font-family: 'Fraunces', serif;
             font-size: 0.72rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.12em;
-            color: rgba(191,155,120,0.6);
+            color: rgba(191, 155, 120, 0.6);
         }
+
         .page-lang {
             font-size: 0.68rem;
-            color: rgba(255,255,255,0.25);
+            color: rgba(255, 255, 255, 0.25);
             margin-top: 0.15rem;
         }
 
@@ -184,20 +320,29 @@
             flex-direction: column;
             gap: 0.6rem;
             scrollbar-width: thin;
-            scrollbar-color: rgba(255,255,255,0.08) transparent;
+            scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
         }
-        .transcript::-webkit-scrollbar { width: 3px; }
-        .transcript::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+        .transcript::-webkit-scrollbar {
+            width: 3px;
+        }
+
+        .transcript::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+        }
 
         .transcript-entry {
-            animation: entryIn 0.35s cubic-bezier(0.16,1,0.3,1);
+            animation: entryIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         }
+
         .transcript-entry .ts {
             font-size: 0.62rem;
-            color: rgba(255,255,255,0.2);
+            color: rgba(255, 255, 255, 0.2);
             font-family: 'SF Mono', 'Menlo', monospace;
             margin-bottom: 0.15rem;
         }
+
         .transcript-entry .text {
             font-family: 'Fraunces', 'Noto Sans SC', 'Noto Sans Devanagari', serif;
             font-size: 1.15rem;
@@ -205,44 +350,65 @@
             color: #ece5da;
             font-weight: 300;
         }
-        .page-left .transcript-entry .text { color: #d8cfc2; }
-        .page-right .transcript-entry .text { color: #f0e8dc; }
+
+        .page-left .transcript-entry .text {
+            color: #d8cfc2;
+        }
+
+        .page-right .transcript-entry .text {
+            color: #f0e8dc;
+        }
 
         .transcript-empty {
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: rgba(255,255,255,0.12);
+            color: rgba(255, 255, 255, 0.12);
             font-family: 'Fraunces', serif;
             font-size: 0.9rem;
             font-style: italic;
         }
 
         @keyframes entryIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* Active speaking indicator */
-        .page.speaking { background: linear-gradient(135deg, rgba(191,155,120,0.04), transparent 40%); }
+        .page.speaking {
+            background: linear-gradient(135deg, rgba(191, 155, 120, 0.04), transparent 40%);
+        }
+
         .page.speaking-ripple {
-            box-shadow: inset 0 0 30px rgba(191,155,120,0.06);
+            box-shadow: inset 0 0 30px rgba(191, 155, 120, 0.06);
             transition: box-shadow 0.3s;
         }
 
         /* Audio waveform indicator near mic */
         .audio-level {
-            position: fixed; bottom: 78px; left: 50%; transform: translateX(-50%);
-            width: 80px; height: 3px;
-            background: rgba(255,255,255,0.06);
+            position: fixed;
+            bottom: 78px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.06);
             border-radius: 3px;
             z-index: 21;
             overflow: hidden;
         }
+
         .audio-level-bar {
             height: 100%;
-            background: linear-gradient(90deg, rgba(191,155,120,0.5), rgba(191,155,120,0.9));
+            background: linear-gradient(90deg, rgba(191, 155, 120, 0.5), rgba(191, 155, 120, 0.9));
             border-radius: 3px;
             width: 0%;
             transition: width 0.1s;
@@ -250,13 +416,25 @@
 
         /* Connection celebration */
         @keyframes celebrateIn {
-            0% { transform: translateX(-50%) scale(0.5); opacity: 0; }
-            50% { transform: translateX(-50%) scale(1.1); opacity: 1; }
-            100% { transform: translateX(-50%) scale(1); opacity: 1; }
+            0% {
+                transform: translateX(-50%) scale(0.5);
+                opacity: 0;
+            }
+
+            50% {
+                transform: translateX(-50%) scale(1.1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateX(-50%) scale(1);
+                opacity: 1;
+            }
         }
+
         .toast.celebrate {
-            background: rgba(76,175,80,0.18);
-            border: 1px solid rgba(76,175,80,0.4);
+            background: rgba(76, 175, 80, 0.18);
+            border: 1px solid rgba(76, 175, 80, 0.4);
             color: #a5d6a7;
             animation: celebrateIn 0.5s ease-out, toastOut 0.35s 3.5s forwards;
         }
@@ -264,107 +442,404 @@
         /* ── Scene/Vision overlay ── */
         .scene-overlay {
             position: absolute;
-            bottom: 0; left: 0; right: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
             padding: 0.6rem 1.2rem;
-            background: linear-gradient(transparent, rgba(10,10,14,0.9));
+            background: linear-gradient(transparent, rgba(10, 10, 14, 0.9));
             font-size: 0.78rem;
-            color: rgba(191,155,120,0.7);
+            color: rgba(191, 155, 120, 0.7);
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.4s;
         }
-        .scene-overlay.visible { opacity: 1; }
+
+        .scene-overlay.visible {
+            opacity: 1;
+        }
 
         /* ── Sentiment badge ── */
         .sentiment-badge {
-            position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
-            padding: 0.35rem 1rem; border-radius: 16px;
-            font-size: 0.78rem; font-weight: 500; z-index: 15;
-            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+            position: fixed;
+            top: 56px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.35rem 1rem;
+            border-radius: 16px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            z-index: 15;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
         }
-        .sentiment-badge.visible { opacity: 1; }
-        .sentiment-happiness { background: rgba(76,175,80,0.15); border: 1px solid rgba(76,175,80,0.35); color: #a5d6a7; }
-        .sentiment-sadness { background: rgba(66,165,245,0.15); border: 1px solid rgba(66,165,245,0.35); color: #90caf9; }
-        .sentiment-surprise { background: rgba(255,183,77,0.15); border: 1px solid rgba(255,183,77,0.35); color: #ffe0b2; }
+
+        .sentiment-badge.visible {
+            opacity: 1;
+        }
+
+        .sentiment-happiness {
+            background: rgba(76, 175, 80, 0.15);
+            border: 1px solid rgba(76, 175, 80, 0.35);
+            color: #a5d6a7;
+        }
+
+        .sentiment-sadness {
+            background: rgba(66, 165, 245, 0.15);
+            border: 1px solid rgba(66, 165, 245, 0.35);
+            color: #90caf9;
+        }
+
+        .sentiment-surprise {
+            background: rgba(255, 183, 77, 0.15);
+            border: 1px solid rgba(255, 183, 77, 0.35);
+            color: #ffe0b2;
+        }
+
+        /* ── Voice Sentiment Badge ── */
+        .voice-sentiment-badge {
+            position: fixed;
+            top: 82px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.3rem 0.9rem;
+            border-radius: 14px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            z-index: 16;
+            opacity: 0;
+            transition: opacity 0.35s;
+            pointer-events: none;
+            max-width: 320px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .voice-sentiment-badge.visible {
+            opacity: 1;
+        }
+
+        .voice-sentiment-badge .vs-icon {
+            margin-right: 4px;
+        }
+
+        .voice-sentiment-badge .vs-snippet {
+            font-style: italic;
+            opacity: 0.7;
+            margin-left: 6px;
+            font-size: 0.65rem;
+        }
+
+        .voice-sentiment-joy {
+            background: rgba(76, 175, 80, 0.12);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #a5d6a7;
+        }
+
+        .voice-sentiment-love {
+            background: rgba(233, 30, 99, 0.12);
+            border: 1px solid rgba(233, 30, 99, 0.3);
+            color: #f48fb1;
+        }
+
+        .voice-sentiment-sadness {
+            background: rgba(66, 165, 245, 0.12);
+            border: 1px solid rgba(66, 165, 245, 0.3);
+            color: #90caf9;
+        }
+
+        .voice-sentiment-anger {
+            background: rgba(244, 67, 54, 0.12);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            color: #ef9a9a;
+        }
+
+        .voice-sentiment-excitement {
+            background: rgba(255, 183, 77, 0.12);
+            border: 1px solid rgba(255, 183, 77, 0.3);
+            color: #ffe0b2;
+        }
+
+        .voice-sentiment-worry {
+            background: rgba(171, 71, 188, 0.12);
+            border: 1px solid rgba(171, 71, 188, 0.3);
+            color: #ce93d8;
+        }
+
+        .emoji-layer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 26;
+            overflow: hidden;
+        }
+
+        .emoji-pop {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            font-size: 1.35rem;
+            filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.28));
+            animation: emojiRise 1.35s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes emojiRise {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, 8px) scale(0.7);
+            }
+
+            20% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -54px) scale(1.2);
+            }
+        }
 
         /* ── Camera PiP + motion overlay ── */
         .cam-pip {
-            position: fixed; bottom: 82px; right: 12px;
-            width: 140px; height: 105px;
-            z-index: 15; display: none;
-            border-radius: 12px; overflow: hidden;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-            border: 1px solid rgba(255,255,255,0.1);
+            position: fixed;
+            bottom: 82px;
+            right: 12px;
+            width: 220px;
+            height: 165px;
+            z-index: 15;
+            display: none;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .cam-pip video, .cam-pip canvas {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
+
+        .cam-pip video,
+        .cam-pip canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             border-radius: 12px;
         }
-        .cam-pip video { object-fit: cover; }
-        .cam-pip canvas { pointer-events: none; }
+
+        .cam-pip video {
+            object-fit: cover;
+        }
+
+        .cam-pip #motionCanvas {
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .cam-pip #overlayCanvas {
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .cam-pip .scene-label {
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            right: 4px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.85);
+            background: rgba(0, 0, 0, 0.55);
+            padding: 2px 6px;
+            border-radius: 6px;
+            z-index: 3;
+            pointer-events: none;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .cam-pip .scene-label.visible {
+            opacity: 1;
+        }
 
         /* ── Visual moment entry (key vision/sentiment) ── */
         .transcript-entry.visual-moment .text {
             font-family: 'DM Sans', sans-serif;
             font-size: 0.82rem;
             font-style: italic;
-            color: rgba(191,155,120,0.7);
+            color: rgba(191, 155, 120, 0.7);
             padding-left: 0.6rem;
-            border-left: 2px solid rgba(191,155,120,0.25);
+            border-left: 2px solid rgba(191, 155, 120, 0.25);
         }
-        .transcript-entry.visual-moment .ts { color: rgba(191,155,120,0.35); }
+
+        .transcript-entry.visual-moment .ts {
+            color: rgba(191, 155, 120, 0.35);
+        }
 
         /* ── Controls bar ── */
         .controls {
-            position: fixed; bottom: 0; left: 0; right: 0; height: 72px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 72px;
             padding: 0 1.5rem;
-            display: flex; justify-content: center; align-items: center; gap: 0.8rem;
-            background: rgba(14,14,18,0.92);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.8rem;
+            background: rgba(14, 14, 18, 0.92);
             backdrop-filter: blur(14px);
             z-index: 20;
-            border-top: 1px solid rgba(255,255,255,0.06);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
+
         .ctrl-btn {
-            width: 48px; height: 48px; border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.1);
-            background: rgba(24,24,28,0.9);
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: all 0.2s; color: #c8bfb0;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(24, 24, 28, 0.9);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            color: #c8bfb0;
         }
-        .ctrl-btn:hover { transform: scale(1.08); }
-        .ctrl-btn:active { transform: scale(0.95); }
-        .ctrl-btn.active { background: rgba(76,175,80,0.18); border-color: rgba(76,175,80,0.4); color: #9fe3b1; }
-        .ctrl-btn.muted { background: rgba(244,67,54,0.12); border-color: rgba(244,67,54,0.35); color: #f5a39a; }
-        .ctrl-btn.cam-active { background: rgba(74,158,255,0.15); border-color: rgba(74,158,255,0.4); color: #a8d0ff; }
-        .ctrl-btn.end { width: 52px; height: 52px; background: rgba(244,67,54,0.18); border-color: rgba(244,67,54,0.45); color: #f7b3ab; }
-        .ctrl-btn svg { width: 18px; height: 18px; }
+
+        .ctrl-btn:hover {
+            transform: scale(1.08);
+        }
+
+        .ctrl-btn:active {
+            transform: scale(0.95);
+        }
+
+        .ctrl-btn.active {
+            background: rgba(76, 175, 80, 0.18);
+            border-color: rgba(76, 175, 80, 0.4);
+            color: #9fe3b1;
+        }
+
+        .ctrl-btn.muted {
+            background: rgba(244, 67, 54, 0.12);
+            border-color: rgba(244, 67, 54, 0.35);
+            color: #f5a39a;
+        }
+
+        .ctrl-btn.cam-active {
+            background: rgba(74, 158, 255, 0.15);
+            border-color: rgba(74, 158, 255, 0.4);
+            color: #a8d0ff;
+        }
+
+        .ctrl-btn.end {
+            width: 52px;
+            height: 52px;
+            background: rgba(244, 67, 54, 0.18);
+            border-color: rgba(244, 67, 54, 0.45);
+            color: #f7b3ab;
+        }
+
+        .ctrl-btn svg {
+            width: 18px;
+            height: 18px;
+        }
 
         /* ── Toast ── */
         .toast {
-            position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
-            background: rgba(191,155,120,0.14); border: 1px solid rgba(191,155,120,0.3);
+            position: fixed;
+            top: 56px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(191, 155, 120, 0.14);
+            border: 1px solid rgba(191, 155, 120, 0.3);
             backdrop-filter: blur(12px);
-            padding: 0.5rem 1.2rem; border-radius: 20px;
-            font-size: 0.82rem; color: #e6c6a1; z-index: 30;
+            padding: 0.5rem 1.2rem;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            color: #e6c6a1;
+            z-index: 30;
             animation: toastIn 0.35s ease-out, toastOut 0.35s 2.5s forwards;
         }
-        @keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(-8px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
-        @keyframes toastOut { to { opacity:0; transform: translateX(-50%) translateY(-8px); } }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        @keyframes toastOut {
+            to {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-8px);
+            }
+        }
 
         @media (max-width: 700px) {
-            .book { flex-direction: column; }
-            .bridge { width: 100%; height: 32px; flex-direction: row; }
-            .bridge::before { top: 50%; left: 0; right: 0; bottom: auto; width: auto; height: 2px; transform: none; }
-            .bridge-dot.top { top: 50%; left: 15%; transform: translateY(-50%); }
-            .bridge-dot.bottom { bottom: auto; top: 50%; right: 15%; left: auto; transform: translateY(-50%); }
-            .bridge-particle { writing-mode: horizontal-tb; }
-            .page { min-height: 0; }
-            .transcript { padding: 0.8rem 1rem; }
-            .transcript-entry .text { font-size: 1rem; }
+            .book {
+                flex-direction: column;
+            }
+
+            .bridge {
+                width: 100%;
+                height: 32px;
+                flex-direction: row;
+            }
+
+            .bridge::before {
+                top: 50%;
+                left: 0;
+                right: 0;
+                bottom: auto;
+                width: auto;
+                height: 2px;
+                transform: none;
+            }
+
+            .bridge-dot.top {
+                top: 50%;
+                left: 15%;
+                transform: translateY(-50%);
+            }
+
+            .bridge-dot.bottom {
+                bottom: auto;
+                top: 50%;
+                right: 15%;
+                left: auto;
+                transform: translateY(-50%);
+            }
+
+            .bridge-particle {
+                writing-mode: horizontal-tb;
+            }
+
+            .page {
+                min-height: 0;
+            }
+
+            .transcript {
+                padding: 0.8rem 1rem;
+            }
+
+            .transcript-entry .text {
+                font-size: 1rem;
+            }
         }
     </style>
 </head>
+
 <body>
     <!-- Top bar -->
     <div class="topbar">
@@ -408,492 +883,805 @@
     </div>
 
     <div class="sentiment-badge" id="sentimentBadge"></div>
+    <div class="voice-sentiment-badge" id="voiceSentimentBadge"></div>
+    <div class="emoji-layer" id="emojiLayer"></div>
     <div class="cam-pip" id="camPip">
         <video id="localVideo" autoplay muted playsinline></video>
         <canvas id="motionCanvas"></canvas>
+        <canvas id="overlayCanvas"></canvas>
+        <div class="scene-label" id="sceneLabel"></div>
     </div>
 
-    <div class="audio-level"><div class="audio-level-bar" id="audioLevelBar"></div></div>
+    <div class="audio-level">
+        <div class="audio-level-bar" id="audioLevelBar"></div>
+    </div>
+
+    <!-- Photo capture flash overlay -->
+    <div id="captureFlash"
+        style="position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:100;transition:opacity 0.15s;">
+    </div>
+
+    <!-- Photo count badge -->
+    <div id="photoBadge"
+        style="position:fixed;top:56px;right:1.2rem;font-family:'DM Sans',sans-serif;font-size:0.72rem;color:#bf9b78;background:rgba(191,155,120,0.12);border:1px solid rgba(191,155,120,0.25);border-radius:12px;padding:0.2rem 0.7rem;z-index:15;opacity:0;transition:opacity 0.3s;">
+        0 photos
+    </div>
 
     <!-- Controls -->
     <div class="controls">
         <button class="ctrl-btn active" id="micBtn" onclick="toggleMic()" title="Microphone">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                <path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3Z"/>
-                <path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>
+                <path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3Z" />
+                <path d="M5 11a7 7 0 0 0 14 0" />
+                <path d="M12 18v3" />
             </svg>
         </button>
         <button class="ctrl-btn" id="camBtn" title="Toggle camera">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                <rect x="3" y="7" width="13" height="10" rx="2"/>
-                <path d="M16 9l5-2v10l-5-2z"/>
+                <rect x="3" y="7" width="13" height="10" rx="2" />
+                <path d="M16 9l5-2v10l-5-2z" />
+            </svg>
+        </button>
+        <button class="ctrl-btn" id="captureBtn" onclick="capturePhoto()" title="Capture moment"
+            style="background:rgba(232,165,75,0.12);border-color:rgba(232,165,75,0.35);color:#e8a54b;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <circle cx="12" cy="13" r="4" />
+                <path d="M9 2L7.17 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3.17L15 2H9z" />
+            </svg>
+        </button>
+        <button class="ctrl-btn" id="transcriptBtn" onclick="downloadTranscript()" title="Download transcript"
+            style="background:rgba(100,180,255,0.12);border-color:rgba(100,180,255,0.35);color:#64b4ff;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="13" x2="12" y2="18" />
+                <polyline points="9 16 12 18 15 16" />
             </svg>
         </button>
         <button class="ctrl-btn end" onclick="endCall()" title="End call">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
-                <path d="M5 5l14 14M19 5l-14 14"/>
+                <path d="M5 5l14 14M19 5l-14 14" />
             </svg>
         </button>
     </div>
 
     <script>
-    const params = new URLSearchParams(window.location.search);
-    const participantName = params.get('name') || 'anon';
-    const participantLang = params.get('language') || 'English';
-    const roomId = window.location.pathname.split('/room/')[1] || 'demo';
-    const pidKey = `zaiyiqi_pid_${roomId}_${participantName}`;
-    let participantId = localStorage.getItem(pidKey);
-    if (!participantId) {
-        participantId = participantName + '_' + Math.random().toString(36).slice(2,8);
-        localStorage.setItem(pidKey, participantId);
-    }
+        const params = new URLSearchParams(window.location.search);
+        const participantName = params.get('name') || 'anon';
+        const participantLang = params.get('language') || 'English';
+        const roomId = window.location.pathname.split('/room/')[1] || 'demo';
+        const pidKey = `zaiyiqi_pid_${roomId}_${participantName}`;
+        let participantId = localStorage.getItem(pidKey);
+        if (!participantId) {
+            participantId = participantName + '_' + Math.random().toString(36).slice(2, 8);
+            localStorage.setItem(pidKey, participantId);
+        }
 
-    document.getElementById('roomInfo').textContent = `${roomId} · ${participantName}`;
-    document.getElementById('leftTitle').textContent = participantName;
-    document.getElementById('leftLang').textContent = participantLang;
+        document.getElementById('roomInfo').textContent = `${roomId} · ${participantName}`;
+        document.getElementById('leftTitle').textContent = participantName;
+        document.getElementById('leftLang').textContent = participantLang;
 
-    let callStartTime = null, timerInterval = null;
-    function startTimer() {
-        callStartTime = Date.now();
-        timerInterval = setInterval(() => {
+        let callStartTime = null, timerInterval = null;
+        function startTimer() {
+            callStartTime = Date.now();
+            timerInterval = setInterval(() => {
+                const s = Math.floor((Date.now() - callStartTime) / 1000);
+                document.getElementById('callTimer').textContent =
+                    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+            }, 1000);
+        }
+        function getTimestamp() {
+            if (!callStartTime) return '00:00';
             const s = Math.floor((Date.now() - callStartTime) / 1000);
-            document.getElementById('callTimer').textContent =
-                `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-        }, 1000);
-    }
-    function getTimestamp() {
-        if (!callStartTime) return '00:00';
-        const s = Math.floor((Date.now() - callStartTime) / 1000);
-        return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-    }
+            return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+        }
 
-    const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsUrl = `${wsProto}://${location.host}/ws/${roomId}/${participantId}?language=${encodeURIComponent(participantLang)}`;
+        const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsUrl = `${wsProto}://${location.host}/ws/${roomId}/${participantId}?language=${encodeURIComponent(participantLang)}`;
 
-    let ws = null, micStream = null, audioContext = null, scriptProcessor = null;
-    let isMicMuted = false, isCamActive = false, camStream = null, captureInterval = null;
-    let intentionalClose = false, micStarted = false, timerStarted = false;
-    let audioQueue = [], isPlaying = false;
-    let currentAudioLevel = 0;
+        let ws = null, micStream = null, audioContext = null, scriptProcessor = null;
+        let isMicMuted = false, isCamActive = false, camStream = null, captureInterval = null;
+        let intentionalClose = false, micStarted = false, timerStarted = false;
+        let pingInterval = null;
+        let audioQueue = [], isPlaying = false;
+        let currentAudioLevel = 0;
 
-    function connectWS() {
-        if (intentionalClose) return;
-        const badge = document.getElementById('statusBadge');
-        badge.textContent = 'Connecting'; badge.className = 'status connecting';
-        ws = new WebSocket(wsUrl);
-        ws.onopen = () => {
-            badge.textContent = 'Live'; badge.className = 'status connected';
-            if (!micStarted) { startMic(); micStarted = true; }
-            if (!timerStarted) { startTimer(); timerStarted = true; }
-        };
-        ws.onmessage = (e) => { try { handleMessage(JSON.parse(e.data)); } catch(err) { console.error(err); } };
-        ws.onclose = () => {
+        function connectWS() {
             if (intentionalClose) return;
-            badge.textContent = 'Reconnecting'; badge.className = 'status connecting';
-            setTimeout(connectWS, 2000);
-        };
-        ws.onerror = (err) => console.error('WS error', err);
-    }
-
-    let lastVisualTs = 0;
-    let lastVisualText = '';
-    let lastSentimentTs = 0;
-    const VISUAL_DEBOUNCE_MS = 10000;
-    const SENTIMENT_DEBOUNCE_MS = 12000;
-
-    function handleMessage(msg) {
-        switch (msg.type) {
-            case 'audio':
-                playAudio(msg.data, msg.mime_type);
-                break;
-            case 'caption':
-                if (msg.side === 'mine') {
-                    addEntry('left', msg.text);
-                } else {
-                    // Animate text crossing the bridge before adding to transcript
-                    animateBridgeCrossing(msg.text, 'right');
-                    addEntry('right', msg.text);
-                }
-                break;
-            case 'visual_caption':
-                showScene(msg.text);
-                maybeAddVisualMoment(msg.text);
-                break;
-            case 'narration':
-                addEntry('right', msg.text);
-                showScene(msg.text);
-                break;
-            case 'sentiment':
-                showSentiment(msg.emotion);
-                maybeAddSentimentMoment(msg.emotion);
-                break;
-            case 'trigger':
-                if (!msg.target_participant_id || msg.target_participant_id === participantId) {
-                    if (!isCamActive) activateCam();
-                }
-                break;
-            case 'participant_joined':
-                showToast(`${msg.participant_id.split('_')[0]} is here`, true);
-                document.getElementById('rightTitle').textContent = msg.participant_id.split('_')[0];
-                // Light up bridge dots when both connected
-                document.getElementById('bridgeDotTop').classList.add('active');
-                document.getElementById('bridgeDotBottom').classList.add('active');
-                break;
-            case 'participant_reconnected':
-                showToast(`${msg.participant_id.split('_')[0]} reconnected`, true);
-                break;
-            case 'participant_left':
-                showToast('They stepped away');
-                document.getElementById('bridgeDotBottom').classList.remove('active');
-                break;
-            case 'room_state':
-                if (msg.languages) {
-                    const otherLang = msg.languages.find(l => l && l !== participantLang) || '';
-                    document.getElementById('rightLang').textContent = otherLang;
-                }
-                if (msg.participant_order) {
-                    const other = msg.participant_order.find(p => p !== participantId);
-                    if (other) document.getElementById('rightTitle').textContent = other.split('_')[0];
-                }
-                break;
-            case 'error':
-                console.error('Server:', msg.message);
-                showToast(msg.message || 'Error');
-                break;
-        }
-    }
-
-    function maybeAddVisualMoment(text) {
-        const now = Date.now();
-        if ((now - lastVisualTs) < VISUAL_DEBOUNCE_MS) return;
-        if (text === lastVisualText) return;
-        lastVisualTs = now;
-        lastVisualText = text;
-        addVisualEntry('right', `Scene: ${text}`);
-    }
-
-    function maybeAddSentimentMoment(emotion) {
-        const now = Date.now();
-        if ((now - lastSentimentTs) < SENTIMENT_DEBOUNCE_MS) return;
-        lastSentimentTs = now;
-        const label = SENT_LABELS[emotion] || emotion;
-        addVisualEntry('right', `${label} detected`);
-    }
-
-    /* ── Bridge animation ── */
-    function animateBridgeCrossing(text, direction) {
-        const bridge = document.getElementById('bridge');
-        const particle = document.createElement('div');
-        particle.className = 'bridge-particle';
-        // Show first few chars of the caption as a crossing fragment
-        particle.textContent = text.length > 6 ? text.slice(0, 6) + '...' : text;
-        particle.classList.add(direction === 'right' ? 'crossing-right' : 'crossing-left');
-        bridge.appendChild(particle);
-        bridge.classList.add('active');
-        setTimeout(() => {
-            particle.remove();
-            if (!bridge.querySelector('.bridge-particle')) bridge.classList.remove('active');
-        }, 1200);
-    }
-
-    /* ── Transcript entries ── */
-    function addEntry(side, text) {
-        const container = document.getElementById(side === 'left' ? 'transcriptLeft' : 'transcriptRight');
-        const empty = document.getElementById(side === 'left' ? 'emptyLeft' : 'emptyRight');
-        if (empty) empty.remove();
-
-        const page = document.getElementById(side === 'left' ? 'pageLeft' : 'pageRight');
-        page.classList.add('speaking', 'speaking-ripple');
-        setTimeout(() => page.classList.remove('speaking', 'speaking-ripple'), 1500);
-
-        const entry = document.createElement('div');
-        entry.className = 'transcript-entry';
-        entry.innerHTML = `<div class="ts">${getTimestamp()}</div><div class="text">${escapeHtml(text)}</div>`;
-        container.appendChild(entry);
-        container.scrollTop = container.scrollHeight;
-
-        while (container.children.length > 60) container.removeChild(container.firstChild);
-    }
-
-    function addVisualEntry(side, text) {
-        const container = document.getElementById(side === 'left' ? 'transcriptLeft' : 'transcriptRight');
-        const empty = document.getElementById(side === 'left' ? 'emptyLeft' : 'emptyRight');
-        if (empty) empty.remove();
-        const entry = document.createElement('div');
-        entry.className = 'transcript-entry visual-moment';
-        entry.innerHTML = `<div class="ts">${getTimestamp()}</div><div class="text">${escapeHtml(text)}</div>`;
-        container.appendChild(entry);
-        container.scrollTop = container.scrollHeight;
-        while (container.children.length > 60) container.removeChild(container.firstChild);
-    }
-
-    function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-    /* ── Scene overlay ── */
-    let sceneTimeout = null;
-    function showScene(text) {
-        const el = document.getElementById('sceneRight');
-        el.textContent = text;
-        el.classList.add('visible');
-        clearTimeout(sceneTimeout);
-        sceneTimeout = setTimeout(() => el.classList.remove('visible'), 8000);
-    }
-
-    /* ── Sentiment ── */
-    const SENT_LABELS = { happiness:'Happy', sadness:'Sad', anger:'Angry', surprise:'Surprised' };
-    let sentTimeout = null;
-    function showSentiment(emotion) {
-        const el = document.getElementById('sentimentBadge');
-        el.textContent = SENT_LABELS[emotion] || emotion;
-        el.className = 'sentiment-badge visible sentiment-' + emotion;
-        clearTimeout(sentTimeout);
-        sentTimeout = setTimeout(() => el.classList.remove('visible'), 5000);
-    }
-
-    /* ── Toast ── */
-    function showToast(text, celebrate) {
-        const t = document.createElement('div');
-        t.className = celebrate ? 'toast celebrate' : 'toast';
-        t.textContent = text;
-        document.body.appendChild(t);
-        setTimeout(() => t.remove(), celebrate ? 4000 : 3000);
-    }
-
-    /* ── Audio level visualizer ── */
-    let audioLevelRAF = null;
-    function updateAudioLevel() {
-        const bar = document.getElementById('audioLevelBar');
-        const bridge = document.getElementById('bridge');
-        if (bar) {
-            const pct = Math.min(currentAudioLevel * 500, 100);
-            bar.style.width = pct + '%';
-        }
-        // Feed audio level to bridge glow
-        if (bridge && currentAudioLevel > 0.01) {
-            bridge.style.setProperty('--bridge-glow', Math.min(0.05 + currentAudioLevel * 3, 0.25));
-            bridge.classList.add('active');
-        } else if (bridge) {
-            bridge.classList.remove('active');
-        }
-        audioLevelRAF = requestAnimationFrame(updateAudioLevel);
-    }
-    updateAudioLevel();
-
-    /* ── Microphone ── */
-    async function startMic() {
-        try {
-            micStream = await navigator.mediaDevices.getUserMedia({
-                audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-            });
-            audioContext = new AudioContext({ sampleRate: 16000 });
-            const source = audioContext.createMediaStreamSource(micStream);
-            scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
-            scriptProcessor.onaudioprocess = (e) => {
-                if (isMicMuted || !ws || ws.readyState !== WebSocket.OPEN) return;
-                const f32 = e.inputBuffer.getChannelData(0);
-                // VAD: compute RMS and skip silent frames
-                let sumSq = 0;
-                for (let i = 0; i < f32.length; i++) sumSq += f32[i] * f32[i];
-                const rms = Math.sqrt(sumSq / f32.length);
-                currentAudioLevel = rms;
-                if (rms < 0.008) return; // silence gate
-                const i16 = new Int16Array(f32.length);
-                for (let i = 0; i < f32.length; i++) {
-                    const s = Math.max(-1, Math.min(1, f32[i]));
-                    i16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                }
-                ws.send(i16.buffer);
+            const badge = document.getElementById('statusBadge');
+            badge.textContent = 'Connecting'; badge.className = 'status connecting';
+            ws = new WebSocket(wsUrl);
+            ws.onopen = () => {
+                badge.textContent = 'Live'; badge.className = 'status connected';
+                if (!micStarted) { startMic(); micStarted = true; }
+                if (!timerStarted) { startTimer(); timerStarted = true; }
+                clearInterval(pingInterval);
+                pingInterval = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'ping' }));
+                    }
+                }, 15000);
             };
-            source.connect(scriptProcessor);
-            scriptProcessor.connect(audioContext.destination);
-        } catch (err) {
-            console.error('Mic error:', err);
-            showToast('Microphone access required');
+            ws.onmessage = (e) => { try { handleMessage(JSON.parse(e.data)); } catch (err) { console.error(err); } };
+            ws.onclose = () => {
+                clearInterval(pingInterval);
+                if (intentionalClose) return;
+                badge.textContent = 'Reconnecting'; badge.className = 'status connecting';
+                setTimeout(connectWS, 2000);
+            };
+            ws.onerror = (err) => console.error('WS error', err);
         }
-    }
 
-    /* ── Audio playback ── */
-    let ctx24k = null, ctx16k = null;
-    function getCtx(rate) {
-        if (rate === 16000) { if (!ctx16k) ctx16k = new AudioContext({ sampleRate: 16000 }); return ctx16k; }
-        if (!ctx24k) ctx24k = new AudioContext({ sampleRate: 24000 }); return ctx24k;
-    }
+        let lastVisualTs = 0;
+        let lastVisualText = '';
+        let lastSentimentTs = 0;
+        const VISUAL_DEBOUNCE_MS = 10000;
+        const SENTIMENT_DEBOUNCE_MS = 12000;
 
-    function playAudio(b64, mimeType) {
-        const raw = atob(b64);
-        const bytes = new Uint8Array(raw.length);
-        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-        const rateMatch = mimeType && mimeType.match(/rate=(\d+)/);
-        const rate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
-        audioQueue.push({ bytes, rate });
-        if (!isPlaying) drainQueue();
-    }
-
-    function drainQueue() {
-        if (!audioQueue.length) { isPlaying = false; return; }
-        isPlaying = true;
-        const { rate } = audioQueue[0];
-        const batch = [];
-        while (audioQueue.length && audioQueue[0].rate === rate) batch.push(audioQueue.shift().bytes);
-        let total = 0; for (const b of batch) total += b.length;
-        const merged = new Uint8Array(total);
-        let off = 0; for (const b of batch) { merged.set(b, off); off += b.length; }
-        const ctx = getCtx(rate);
-        const i16 = new Int16Array(merged.buffer);
-        const f32 = new Float32Array(i16.length);
-        for (let i = 0; i < i16.length; i++) f32[i] = i16[i] / 0x7FFF;
-        const buf = ctx.createBuffer(1, f32.length, rate);
-        buf.getChannelData(0).set(f32);
-        const src = ctx.createBufferSource();
-        src.buffer = buf; src.connect(ctx.destination);
-        src.onended = drainQueue;
-        src.start();
-    }
-
-    /* ── Camera + Motion detection ── */
-    let prevMotionData = null;
-    let motionInterval = null;
-    const MOTION_W = 80, MOTION_H = 60;
-    const BLOCK = 10, MOTION_THRESHOLD = 28;
-
-    async function activateCam() {
-        if (isCamActive) return;
-        try {
-            camStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
-            const vid = document.getElementById('localVideo');
-            vid.srcObject = camStream;
-            document.getElementById('camPip').style.display = 'block';
-            isCamActive = true;
-            prevMotionData = null;
-            document.getElementById('camBtn').classList.add('cam-active');
-            captureInterval = setInterval(captureFrame, 3000);
-            motionInterval = setInterval(detectMotion, 300);
-            // Notify server to activate vision processing
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'camera_activated', participant_id: participantId }));
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'audio':
+                    playAudio(msg.data, msg.mime_type);
+                    break;
+                case 'caption':
+                    if (msg.side === 'mine') {
+                        addEntry('left', msg.text);
+                    } else {
+                        // Animate text crossing the bridge before adding to transcript
+                        animateBridgeCrossing(msg.text, 'right');
+                        addEntry('right', msg.text);
+                    }
+                    break;
+                case 'visual_caption':
+                    showScene(msg.text);
+                    maybeAddVisualMoment(msg.text);
+                    break;
+                case 'narration':
+                    addEntry('right', msg.text);
+                    showScene(msg.text);
+                    break;
+                case 'sentiment':
+                    showSentiment(msg.emotion);
+                    maybeAddSentimentMoment(msg.emotion);
+                    if (msg.emotion === 'happiness') {
+                        showEmojiBurst(msg.emotion, msg.score || 0);
+                    }
+                    break;
+                case 'voice_sentiment':
+                    showVoiceSentiment(msg.emotion, msg.snippet, msg.speaker, msg.confidence);
+                    if (['joy', 'love', 'excitement'].includes(msg.emotion)) {
+                        showEmojiBurst(msg.emotion === 'love' ? 'happiness' : msg.emotion, 3);
+                    }
+                    break;
+                case 'trigger':
+                    if (!msg.target_participant_id || msg.target_participant_id === participantId) {
+                        if (!isCamActive) activateCam();
+                    }
+                    break;
+                case 'participant_joined':
+                    showToast(`${msg.participant_id.split('_')[0]} is here`, true);
+                    document.getElementById('rightTitle').textContent = msg.participant_id.split('_')[0];
+                    // Light up bridge dots when both connected
+                    document.getElementById('bridgeDotTop').classList.add('active');
+                    document.getElementById('bridgeDotBottom').classList.add('active');
+                    break;
+                case 'participant_reconnected':
+                    showToast(`${msg.participant_id.split('_')[0]} reconnected`, true);
+                    break;
+                case 'participant_left':
+                    showToast('They stepped away');
+                    document.getElementById('bridgeDotBottom').classList.remove('active');
+                    break;
+                case 'room_state':
+                    if (msg.languages) {
+                        const otherLang = msg.languages.find(l => l && l !== participantLang) || '';
+                        document.getElementById('rightLang').textContent = otherLang;
+                    }
+                    if (msg.participant_order) {
+                        const other = msg.participant_order.find(p => p !== participantId);
+                        if (other) document.getElementById('rightTitle').textContent = other.split('_')[0];
+                    }
+                    break;
+                case 'vision_boxes':
+                    drawVisionBoxes(msg.boxes, msg.scene_labels);
+                    break;
+                case 'photo_saved':
+                    photoCount = msg.index;
+                    const badge = document.getElementById('photoBadge');
+                    badge.textContent = `${photoCount} photo${photoCount !== 1 ? 's' : ''}`;
+                    badge.style.opacity = '1';
+                    showToast(`Moment #${msg.index} captured`);
+                    break;
+                case 'photo_stylized':
+                    showToast(`Photo #${msg.index} stylized (${msg.mood})`);
+                    // Pulse the capture button to show processing completed
+                    const capBtn = document.getElementById('captureBtn');
+                    capBtn.style.boxShadow = '0 0 12px rgba(232,165,75,0.4)';
+                    setTimeout(() => capBtn.style.boxShadow = '', 1500);
+                    break;
+                case 'error':
+                    console.error('Server:', msg.message);
+                    showToast(msg.message || 'Error');
+                    break;
             }
-        } catch (e) { showToast('Camera access denied'); }
-    }
-    function deactivateCam() {
-        if (camStream) camStream.getTracks().forEach(t => t.stop());
-        document.getElementById('camPip').style.display = 'none';
-        clearInterval(captureInterval);
-        clearInterval(motionInterval);
-        prevMotionData = null;
-        isCamActive = false;
-        document.getElementById('camBtn').classList.remove('cam-active');
-        const mc = document.getElementById('motionCanvas');
-        mc.getContext('2d').clearRect(0, 0, mc.width, mc.height);
-    }
-    function captureFrame() {
-        if (!camStream || !ws || ws.readyState !== WebSocket.OPEN) return;
-        const v = document.getElementById('localVideo');
-        const c = document.createElement('canvas');
-        c.width = 320; c.height = 240;
-        c.getContext('2d').drawImage(v, 0, 0, 320, 240);
-        c.toBlob(blob => {
-            const r = new FileReader();
-            r.onload = () => ws.send(JSON.stringify({ type: 'video_frame', data: r.result.split(',')[1] }));
-            r.readAsDataURL(blob);
-        }, 'image/jpeg', 0.5);
-    }
+        }
 
-    function detectMotion() {
-        if (!isCamActive || !camStream) return;
-        const v = document.getElementById('localVideo');
-        if (!v.videoWidth) return;
-        const tmp = document.createElement('canvas');
-        tmp.width = MOTION_W; tmp.height = MOTION_H;
-        const tmpCtx = tmp.getContext('2d');
-        tmpCtx.drawImage(v, 0, 0, MOTION_W, MOTION_H);
-        const curr = tmpCtx.getImageData(0, 0, MOTION_W, MOTION_H);
+        function maybeAddVisualMoment(text) {
+            const now = Date.now();
+            if ((now - lastVisualTs) < VISUAL_DEBOUNCE_MS) return;
+            if (text === lastVisualText) return;
+            lastVisualTs = now;
+            lastVisualText = text;
+            addVisualEntry('right', `Scene: ${text}`);
+        }
 
-        const mc = document.getElementById('motionCanvas');
-        mc.width = 140; mc.height = 105;
-        const mCtx = mc.getContext('2d');
-        mCtx.clearRect(0, 0, 140, 105);
+        function maybeAddSentimentMoment(emotion) {
+            const now = Date.now();
+            if ((now - lastSentimentTs) < SENTIMENT_DEBOUNCE_MS) return;
+            lastSentimentTs = now;
+            const label = SENT_LABELS[emotion] || emotion;
+            addVisualEntry('right', `${label} detected`);
+        }
 
-        if (prevMotionData) {
-            const scaleX = 140 / MOTION_W, scaleY = 105 / MOTION_H;
-            const cols = Math.floor(MOTION_W / BLOCK), rows = Math.floor(MOTION_H / BLOCK);
+        /* ── Bridge animation ── */
+        function animateBridgeCrossing(text, direction) {
+            const bridge = document.getElementById('bridge');
+            const particle = document.createElement('div');
+            particle.className = 'bridge-particle';
+            // Show first few chars of the caption as a crossing fragment
+            particle.textContent = text.length > 6 ? text.slice(0, 6) + '...' : text;
+            particle.classList.add(direction === 'right' ? 'crossing-right' : 'crossing-left');
+            bridge.appendChild(particle);
+            bridge.classList.add('active');
+            setTimeout(() => {
+                particle.remove();
+                if (!bridge.querySelector('.bridge-particle')) bridge.classList.remove('active');
+            }, 1200);
+        }
 
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    let diff = 0, cx = 0, cy = 0, cnt = 0;
-                    const x0 = c * BLOCK, y0 = r * BLOCK;
-                    for (let y = y0; y < y0 + BLOCK && y < MOTION_H; y++) {
-                        for (let x = x0; x < x0 + BLOCK && x < MOTION_W; x++) {
-                            const i = (y * MOTION_W + x) * 4;
-                            const d = Math.abs(curr.data[i] - prevMotionData.data[i])
-                                    + Math.abs(curr.data[i+1] - prevMotionData.data[i+1])
-                                    + Math.abs(curr.data[i+2] - prevMotionData.data[i+2]);
-                            diff += d;
-                            if (d > 60) { cx += x; cy += y; cnt++; }
+        /* ── Transcript entries ── */
+        function addEntry(side, text) {
+            const container = document.getElementById(side === 'left' ? 'transcriptLeft' : 'transcriptRight');
+            const empty = document.getElementById(side === 'left' ? 'emptyLeft' : 'emptyRight');
+            if (empty) empty.remove();
+
+            const page = document.getElementById(side === 'left' ? 'pageLeft' : 'pageRight');
+            page.classList.add('speaking', 'speaking-ripple');
+            setTimeout(() => page.classList.remove('speaking', 'speaking-ripple'), 1500);
+
+            const entry = document.createElement('div');
+            entry.className = 'transcript-entry';
+            entry.innerHTML = `<div class="ts">${getTimestamp()}</div><div class="text">${escapeHtml(text)}</div>`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+
+            while (container.children.length > 60) container.removeChild(container.firstChild);
+        }
+
+        function addVisualEntry(side, text) {
+            const container = document.getElementById(side === 'left' ? 'transcriptLeft' : 'transcriptRight');
+            const empty = document.getElementById(side === 'left' ? 'emptyLeft' : 'emptyRight');
+            if (empty) empty.remove();
+            const entry = document.createElement('div');
+            entry.className = 'transcript-entry visual-moment';
+            entry.innerHTML = `<div class="ts">${getTimestamp()}</div><div class="text">${escapeHtml(text)}</div>`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+            while (container.children.length > 60) container.removeChild(container.firstChild);
+        }
+
+        function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        /* ── Scene overlay ── */
+        let sceneTimeout = null;
+        function showScene(text) {
+            const el = document.getElementById('sceneRight');
+            el.textContent = text;
+            el.classList.add('visible');
+            clearTimeout(sceneTimeout);
+            sceneTimeout = setTimeout(() => el.classList.remove('visible'), 8000);
+        }
+
+        /* ── Sentiment ── */
+        const SENT_LABELS = { happiness: 'Happy', sadness: 'Sad', anger: 'Angry', surprise: 'Surprised' };
+        let sentTimeout = null;
+        function showSentiment(emotion) {
+            const el = document.getElementById('sentimentBadge');
+            el.textContent = SENT_LABELS[emotion] || emotion;
+            el.className = 'sentiment-badge visible sentiment-' + emotion;
+            clearTimeout(sentTimeout);
+            sentTimeout = setTimeout(() => el.classList.remove('visible'), 5000);
+        }
+
+        const VS_LABELS = {
+            joy: '😊 Joy', love: '💕 Love', sadness: '😢 Sadness',
+            anger: '😠 Frustration', excitement: '🤩 Excitement', worry: '😟 Concern'
+        };
+        let voiceSentTimeout = null;
+        function showVoiceSentiment(emotion, snippet, speaker, confidence) {
+            const el = document.getElementById('voiceSentimentBadge');
+            const name = speaker ? speaker.split('_')[0] : '';
+            const icon = VS_LABELS[emotion] || emotion;
+            const snipText = snippet ? snippet.substring(0, 40) : '';
+            el.innerHTML = `<span class="vs-icon">${icon}</span>${name ? name + ': ' : ''}<span class="vs-snippet">"${snipText}${snippet && snippet.length > 40 ? '…' : ''}"</span>`;
+            el.className = 'voice-sentiment-badge visible voice-sentiment-' + emotion;
+            clearTimeout(voiceSentTimeout);
+            voiceSentTimeout = setTimeout(() => el.classList.remove('visible'), 6000);
+
+            // Also add as a visual moment in the transcript
+            maybeAddVisualMoment(`🎙️ ${icon} — "${snipText}"`);
+        }
+
+        function showEmojiBurst(emotion, score) {
+            const layer = document.getElementById('emojiLayer');
+            if (!layer) return;
+            const sets = {
+                happiness: ['😊', '😄', '✨', '💚', '🌟', '💫'],
+                surprise: ['😮', '✨'],
+                sadness: ['🥺', '💙'],
+                anger: ['😤', '⚡']
+            };
+            const chars = sets[emotion] || ['✨'];
+            const count = Math.min(10, 4 + Number(score || 0));
+            for (let i = 0; i < count; i++) {
+                const node = document.createElement('span');
+                node.className = 'emoji-pop';
+                node.textContent = chars[Math.floor(Math.random() * chars.length)];
+                node.style.left = `${50 + (Math.random() * 22 - 11)}%`;
+                node.style.top = `${57 + (Math.random() * 12 - 6)}%`;
+                node.style.animationDelay = `${i * 30}ms`;
+                layer.appendChild(node);
+                setTimeout(() => node.remove(), 1600);
+            }
+        }
+
+        /* ── Toast ── */
+        function showToast(text, celebrate) {
+            const t = document.createElement('div');
+            t.className = celebrate ? 'toast celebrate' : 'toast';
+            t.textContent = text;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), celebrate ? 4000 : 3000);
+        }
+
+        /* ── Audio level visualizer ── */
+        let audioLevelRAF = null;
+        function updateAudioLevel() {
+            const bar = document.getElementById('audioLevelBar');
+            const bridge = document.getElementById('bridge');
+            if (bar) {
+                const pct = Math.min(currentAudioLevel * 500, 100);
+                bar.style.width = pct + '%';
+            }
+            // Feed audio level to bridge glow
+            if (bridge && currentAudioLevel > 0.01) {
+                bridge.style.setProperty('--bridge-glow', Math.min(0.05 + currentAudioLevel * 3, 0.25));
+                bridge.classList.add('active');
+            } else if (bridge) {
+                bridge.classList.remove('active');
+            }
+            audioLevelRAF = requestAnimationFrame(updateAudioLevel);
+        }
+        updateAudioLevel();
+
+        /* ── Microphone (AudioWorklet preferred, ScriptProcessor fallback) ── */
+        const SILENCE_GATE = 0.003; // lowered from 0.008 to capture quiet speech
+        let workletNode = null;
+
+        async function startMic() {
+            try {
+                micStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                });
+                audioContext = new AudioContext({ sampleRate: 16000 });
+                console.log('AudioContext sampleRate:', audioContext.sampleRate, '(requested 16000)');
+                const source = audioContext.createMediaStreamSource(micStream);
+
+                // Try AudioWorklet first (dedicated audio thread — never drops buffers)
+                if (audioContext.audioWorklet) {
+                    try {
+                        await audioContext.audioWorklet.addModule('/static/pcm-processor.js');
+                        workletNode = new AudioWorkletNode(audioContext, 'pcm-processor');
+                        workletNode.port.onmessage = (e) => {
+                            if (isMicMuted || !ws || ws.readyState !== WebSocket.OPEN) return;
+                            const { pcm, rms } = e.data;
+                            currentAudioLevel = rms;
+                            // Always send audio to server — Gemini needs silence
+                            // periods to detect turn boundaries (end of speech)
+                            ws.send(pcm);
+                        };
+                        source.connect(workletNode);
+                        workletNode.connect(audioContext.destination);
+                        console.log('Audio: using AudioWorklet (dedicated thread)');
+                        return;
+                    } catch (workletErr) {
+                        console.warn('AudioWorklet failed, falling back:', workletErr);
+                    }
+                }
+
+                // Fallback: ScriptProcessor (deprecated, drops buffers under load)
+                scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+                scriptProcessor.onaudioprocess = (e) => {
+                    if (isMicMuted || !ws || ws.readyState !== WebSocket.OPEN) return;
+                    const f32 = e.inputBuffer.getChannelData(0);
+                    let sumSq = 0;
+                    for (let i = 0; i < f32.length; i++) sumSq += f32[i] * f32[i];
+                    const rms = Math.sqrt(sumSq / f32.length);
+                    currentAudioLevel = rms;
+                    const i16 = new Int16Array(f32.length);
+                    for (let i = 0; i < f32.length; i++) {
+                        const s = Math.max(-1, Math.min(1, f32[i]));
+                        i16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                    }
+                    ws.send(i16.buffer);
+                };
+                source.connect(scriptProcessor);
+                scriptProcessor.connect(audioContext.destination);
+                console.log('Audio: using ScriptProcessor (fallback)');
+            } catch (err) {
+                console.error('Mic error:', err);
+                showToast('Microphone access required');
+            }
+        }
+
+        /* ── Audio playback ── */
+        let ctx24k = null, ctx16k = null;
+        function getCtx(rate) {
+            if (rate === 16000) { if (!ctx16k) ctx16k = new AudioContext({ sampleRate: 16000 }); return ctx16k; }
+            if (!ctx24k) ctx24k = new AudioContext({ sampleRate: 24000 }); return ctx24k;
+        }
+
+        function playAudio(b64, mimeType) {
+            const raw = atob(b64);
+            const bytes = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+            const rateMatch = mimeType && mimeType.match(/rate=(\d+)/);
+            const rate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+            audioQueue.push({ bytes, rate });
+            if (!isPlaying) drainQueue();
+        }
+
+        function drainQueue() {
+            if (!audioQueue.length) { isPlaying = false; return; }
+            isPlaying = true;
+            const { rate } = audioQueue[0];
+            const batch = [];
+            while (audioQueue.length && audioQueue[0].rate === rate) batch.push(audioQueue.shift().bytes);
+            let total = 0; for (const b of batch) total += b.length;
+            const merged = new Uint8Array(total);
+            let off = 0; for (const b of batch) { merged.set(b, off); off += b.length; }
+            const ctx = getCtx(rate);
+            const i16 = new Int16Array(merged.buffer);
+            const f32 = new Float32Array(i16.length);
+            for (let i = 0; i < i16.length; i++) f32[i] = i16[i] / 0x7FFF;
+            const buf = ctx.createBuffer(1, f32.length, rate);
+            buf.getChannelData(0).set(f32);
+            const src = ctx.createBufferSource();
+            src.buffer = buf; src.connect(ctx.destination);
+            src.onended = drainQueue;
+            src.start();
+        }
+
+        /* ── Camera + Motion detection ── */
+        let prevMotionData = null;
+        let motionInterval = null;
+        const MOTION_W = 80, MOTION_H = 60;
+        const BLOCK = 10, MOTION_THRESHOLD = 28;
+
+        async function activateCam() {
+            if (isCamActive) return;
+            try {
+                camStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                const vid = document.getElementById('localVideo');
+                vid.srcObject = camStream;
+                document.getElementById('camPip').style.display = 'block';
+                isCamActive = true;
+                prevMotionData = null;
+                document.getElementById('camBtn').classList.add('cam-active');
+                captureInterval = setInterval(captureFrame, 3000);
+                motionInterval = setInterval(detectMotion, 300);
+                // Notify server to activate vision processing
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'camera_activated', participant_id: participantId }));
+                }
+            } catch (e) { showToast('Camera access denied'); }
+        }
+        function deactivateCam() {
+            if (camStream) camStream.getTracks().forEach(t => t.stop());
+            document.getElementById('camPip').style.display = 'none';
+            clearInterval(captureInterval);
+            clearInterval(motionInterval);
+            prevMotionData = null;
+            isCamActive = false;
+            document.getElementById('camBtn').classList.remove('cam-active');
+            const mc = document.getElementById('motionCanvas');
+            mc.getContext('2d').clearRect(0, 0, mc.width, mc.height);
+        }
+        function captureFrame() {
+            if (!camStream || !ws || ws.readyState !== WebSocket.OPEN) return;
+            const v = document.getElementById('localVideo');
+            const c = document.createElement('canvas');
+            c.width = 320; c.height = 240;
+            c.getContext('2d').drawImage(v, 0, 0, 320, 240);
+            c.toBlob(blob => {
+                const r = new FileReader();
+                r.onload = () => ws.send(JSON.stringify({ type: 'video_frame', data: r.result.split(',')[1] }));
+                r.readAsDataURL(blob);
+            }, 'image/jpeg', 0.5);
+        }
+
+        /* ── PiP dimensions ── */
+        const PIP_W = 220, PIP_H = 165;
+
+        function detectMotion() {
+            if (!isCamActive || !camStream) return;
+            const v = document.getElementById('localVideo');
+            if (!v.videoWidth) return;
+            const tmp = document.createElement('canvas');
+            tmp.width = MOTION_W; tmp.height = MOTION_H;
+            const tmpCtx = tmp.getContext('2d');
+            tmpCtx.drawImage(v, 0, 0, MOTION_W, MOTION_H);
+            const curr = tmpCtx.getImageData(0, 0, MOTION_W, MOTION_H);
+
+            const mc = document.getElementById('motionCanvas');
+            mc.width = PIP_W; mc.height = PIP_H;
+            const mCtx = mc.getContext('2d');
+            mCtx.clearRect(0, 0, PIP_W, PIP_H);
+
+            if (prevMotionData) {
+                const scaleX = PIP_W / MOTION_W, scaleY = PIP_H / MOTION_H;
+                const cols = Math.floor(MOTION_W / BLOCK), rows = Math.floor(MOTION_H / BLOCK);
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        let diff = 0, cx = 0, cy = 0, cnt = 0;
+                        const x0 = c * BLOCK, y0 = r * BLOCK;
+                        for (let y = y0; y < y0 + BLOCK && y < MOTION_H; y++) {
+                            for (let x = x0; x < x0 + BLOCK && x < MOTION_W; x++) {
+                                const i = (y * MOTION_W + x) * 4;
+                                const d = Math.abs(curr.data[i] - prevMotionData.data[i])
+                                    + Math.abs(curr.data[i + 1] - prevMotionData.data[i + 1])
+                                    + Math.abs(curr.data[i + 2] - prevMotionData.data[i + 2]);
+                                diff += d;
+                                if (d > 60) { cx += x; cy += y; cnt++; }
+                            }
+                        }
+                        diff /= (BLOCK * BLOCK * 3);
+                        if (diff > MOTION_THRESHOLD && cnt > 3) {
+                            cx /= cnt; cy /= cnt;
+                            const bx = (x0 + BLOCK / 2) * scaleX;
+                            const by = (y0 + BLOCK / 2) * scaleY;
+                            const dx = (cx - (x0 + BLOCK / 2)) * scaleX * 1.5;
+                            const dy = (cy - (y0 + BLOCK / 2)) * scaleY * 1.5;
+                            drawArrow(mCtx, bx, by, bx + dx, by + dy, Math.min(diff / 60, 1));
                         }
                     }
-                    diff /= (BLOCK * BLOCK * 3);
-                    if (diff > MOTION_THRESHOLD && cnt > 3) {
-                        cx /= cnt; cy /= cnt;
-                        const bx = (x0 + BLOCK/2) * scaleX;
-                        const by = (y0 + BLOCK/2) * scaleY;
-                        const dx = (cx - (x0 + BLOCK/2)) * scaleX * 1.5;
-                        const dy = (cy - (y0 + BLOCK/2)) * scaleY * 1.5;
-                        drawArrow(mCtx, bx, by, bx + dx, by + dy, Math.min(diff / 60, 1));
-                    }
                 }
             }
+            prevMotionData = curr;
         }
-        prevMotionData = curr;
-    }
 
-    function drawArrow(ctx, fx, fy, tx, ty, alpha) {
-        const len = Math.hypot(tx - fx, ty - fy);
-        if (len < 2) return;
-        const angle = Math.atan2(ty - fy, tx - fx);
-        const headLen = Math.min(6, len * 0.4);
-        ctx.save();
-        ctx.strokeStyle = `rgba(76, 255, 76, ${0.5 + alpha * 0.5})`;
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.lineWidth = 1.5;
-        ctx.shadowColor = 'rgba(76, 255, 76, 0.4)';
-        ctx.shadowBlur = 3;
-        ctx.beginPath();
-        ctx.moveTo(fx, fy); ctx.lineTo(tx, ty);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(tx - headLen * Math.cos(angle - 0.45), ty - headLen * Math.sin(angle - 0.45));
-        ctx.lineTo(tx - headLen * Math.cos(angle + 0.45), ty - headLen * Math.sin(angle + 0.45));
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-    }
+        /* ── Vision Bounding Boxes ── */
+        let boxesTimeout = null;
+        let sceneLabelTimeout = null;
+        function drawVisionBoxes(boxes, sceneLabels) {
+            const c = document.getElementById('overlayCanvas');
+            if (c.width !== PIP_W || c.height !== PIP_H) {
+                c.width = PIP_W;
+                c.height = PIP_H;
+            }
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0, 0, c.width, c.height);
 
-    /* ── Controls ── */
-    function toggleMic() {
-        isMicMuted = !isMicMuted;
-        const btn = document.getElementById('micBtn');
-        btn.classList.toggle('muted', isMicMuted);
-        btn.classList.toggle('active', !isMicMuted);
-    }
-    function endCall() {
-        intentionalClose = true;
-        if (ws) ws.close();
-        if (micStream) micStream.getTracks().forEach(t => t.stop());
-        if (camStream) camStream.getTracks().forEach(t => t.stop());
-        clearInterval(timerInterval);
-        clearInterval(captureInterval);
-        clearInterval(motionInterval);
-        window.location.href = `/room/${roomId}/memories`;
-    }
+            // Color map for named colors from server
+            const colorMap = {
+                green: { stroke: '#4caf50', fill: 'rgba(76,175,80,0.15)', text: 'rgba(76,175,80,0.9)', glow: 'rgba(76,175,80,0.4)' },
+                red: { stroke: '#f44336', fill: 'rgba(244,67,54,0.15)', text: 'rgba(244,67,54,0.9)', glow: 'rgba(244,67,54,0.4)' },
+                purple: { stroke: '#ab47bc', fill: 'rgba(171,71,188,0.15)', text: 'rgba(171,71,188,0.9)', glow: 'rgba(171,71,188,0.4)' },
+            };
 
-    /* ── Camera: click-to-toggle ── */
-    document.getElementById('camBtn').addEventListener('click', e => {
-        e.preventDefault();
-        if (isCamActive) { deactivateCam(); } else { activateCam(); }
-    });
+            boxes.forEach(box => {
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                box.vertices.forEach(v => {
+                    let x = v.x || 0;
+                    let y = v.y || 0;
+                    if (!box.normalized) {
+                        x = (x / 320) * c.width;
+                        y = (y / 240) * c.height;
+                    } else {
+                        x = x * c.width;
+                        y = y * c.height;
+                    }
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                });
 
-    connectWS();
+                const w = maxX - minX;
+                const h = maxY - minY;
+                if (w < 2 || h < 2) return;
+
+                const colors = colorMap[box.color] || colorMap.green;
+
+                // Glow effect
+                ctx.save();
+                ctx.shadowColor = colors.glow;
+                ctx.shadowBlur = 6;
+
+                // Fill with translucent color
+                ctx.fillStyle = colors.fill;
+                ctx.fillRect(minX, minY, w, h);
+
+                // Stroke border
+                ctx.strokeStyle = colors.stroke;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(minX, minY, w, h);
+                ctx.restore();
+
+                // Label background pill
+                ctx.font = 'bold 9px "DM Sans", sans-serif';
+                const textWidth = ctx.measureText(box.label).width;
+                const labelH = 14;
+                const labelY = minY > labelH + 2 ? minY - labelH - 2 : minY + h + 2;
+                const pillW = textWidth + 8;
+
+                ctx.fillStyle = colors.stroke;
+                ctx.beginPath();
+                const r = 3;
+                ctx.moveTo(minX + r, labelY);
+                ctx.lineTo(minX + pillW - r, labelY);
+                ctx.quadraticCurveTo(minX + pillW, labelY, minX + pillW, labelY + r);
+                ctx.lineTo(minX + pillW, labelY + labelH - r);
+                ctx.quadraticCurveTo(minX + pillW, labelY + labelH, minX + pillW - r, labelY + labelH);
+                ctx.lineTo(minX + r, labelY + labelH);
+                ctx.quadraticCurveTo(minX, labelY + labelH, minX, labelY + labelH - r);
+                ctx.lineTo(minX, labelY + r);
+                ctx.quadraticCurveTo(minX, labelY, minX + r, labelY);
+                ctx.fill();
+
+                // Label text
+                ctx.fillStyle = 'white';
+                ctx.fillText(box.label, minX + 4, labelY + 10);
+            });
+
+            // Show scene labels in the PiP footer
+            if (sceneLabels && sceneLabels.length > 0) {
+                const el = document.getElementById('sceneLabel');
+                el.textContent = sceneLabels.join(' · ');
+                el.classList.add('visible');
+                clearTimeout(sceneLabelTimeout);
+                sceneLabelTimeout = setTimeout(() => el.classList.remove('visible'), 4000);
+            }
+
+            // Clear boxes after timeout if not refreshed
+            clearTimeout(boxesTimeout);
+            boxesTimeout = setTimeout(() => {
+                ctx.clearRect(0, 0, c.width, c.height);
+            }, 2500);
+        }
+
+        function drawArrow(ctx, fx, fy, tx, ty, alpha) {
+            const len = Math.hypot(tx - fx, ty - fy);
+            if (len < 2) return;
+            const angle = Math.atan2(ty - fy, tx - fx);
+            const headLen = Math.min(6, len * 0.4);
+            ctx.save();
+            ctx.strokeStyle = `rgba(76, 255, 76, ${0.5 + alpha * 0.5})`;
+            ctx.fillStyle = ctx.strokeStyle;
+            ctx.lineWidth = 1.5;
+            ctx.shadowColor = 'rgba(76, 255, 76, 0.4)';
+            ctx.shadowBlur = 3;
+            ctx.beginPath();
+            ctx.moveTo(fx, fy); ctx.lineTo(tx, ty);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(tx, ty);
+            ctx.lineTo(tx - headLen * Math.cos(angle - 0.45), ty - headLen * Math.sin(angle - 0.45));
+            ctx.lineTo(tx - headLen * Math.cos(angle + 0.45), ty - headLen * Math.sin(angle + 0.45));
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        /* ── Controls ── */
+        function toggleMic() {
+            isMicMuted = !isMicMuted;
+            const btn = document.getElementById('micBtn');
+            btn.classList.toggle('muted', isMicMuted);
+            btn.classList.toggle('active', !isMicMuted);
+        }
+        function endCall() {
+            intentionalClose = true;
+            if (ws) ws.close();
+            if (workletNode) { workletNode.disconnect(); workletNode = null; }
+            if (micStream) micStream.getTracks().forEach(t => t.stop());
+            if (camStream) camStream.getTracks().forEach(t => t.stop());
+            clearInterval(timerInterval);
+            clearInterval(captureInterval);
+            clearInterval(motionInterval);
+            clearInterval(pingInterval);
+            window.location.href = `/room/${roomId}/memories`;
+        }
+
+        /* ── Download Transcript ── */
+        async function downloadTranscript() {
+            try {
+                const resp = await fetch(`/api/rooms/${roomId}/transcript`);
+                if (!resp.ok) {
+                    showToast('No transcript yet');
+                    return;
+                }
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${roomId}_transcript.md`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                showToast('Transcript downloaded');
+            } catch (e) {
+                console.error('Transcript download error:', e);
+                showToast('Download failed');
+            }
+        }
+
+        /* ── Photo Capture ── */
+        let photoCount = 0;
+
+
+        function capturePhoto() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showToast('Not connected');
+                return;
+            }
+            // Prefer camera frame if active, otherwise capture a "moment" snapshot of the screen
+            const v = document.getElementById('localVideo');
+            const c = document.createElement('canvas');
+            if (isCamActive && v.videoWidth) {
+                c.width = 640; c.height = 480;
+                c.getContext('2d').drawImage(v, 0, 0, 640, 480);
+            } else {
+                c.width = 320; c.height = 240;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#1a1814';
+                ctx.fillRect(0, 0, 320, 240);
+                ctx.fillStyle = '#bf9b78';
+                ctx.font = '16px Fraunces, serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Audio Moment', 160, 120);
+                ctx.fillText(getTimestamp(), 160, 145);
+            }
+            c.toBlob(blob => {
+                const r = new FileReader();
+                r.onload = () => {
+                    const b64 = r.result.split(',')[1];
+                    ws.send(JSON.stringify({ type: 'photo_capture', data: b64 }));
+                };
+                r.readAsDataURL(blob);
+            }, 'image/jpeg', 0.85);
+
+            // Flash effect
+            const flash = document.getElementById('captureFlash');
+            flash.style.opacity = '0.7';
+            setTimeout(() => flash.style.opacity = '0', 150);
+
+            // Shutter animation on button
+            const btn = document.getElementById('captureBtn');
+            btn.style.transform = 'scale(0.85)';
+            setTimeout(() => btn.style.transform = '', 150);
+        }
+
+        /* ── Camera: click-to-toggle ── */
+        document.getElementById('camBtn').addEventListener('click', e => {
+            e.preventDefault();
+            if (isCamActive) { deactivateCam(); } else { activateCam(); }
+        });
+
+        connectWS();
     </script>
 </body>
+
 </html>

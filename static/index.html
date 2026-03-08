@@ -186,6 +186,22 @@
             color: #777;
             border: 1px solid rgba(255,255,255,0.08);
         }
+        .demo-links {
+            margin-top: 0.9rem;
+            display: flex;
+            justify-content: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+        .demo-link {
+            font-size: 0.72rem;
+            color: rgba(191,155,120,0.9);
+            text-decoration: none;
+            border: 1px solid rgba(191,155,120,0.3);
+            background: rgba(191,155,120,0.08);
+            border-radius: 12px;
+            padding: 0.25rem 0.65rem;
+        }
     </style>
 </head>
 <body>
@@ -224,6 +240,10 @@
             <button class="join-btn" onclick="joinRoom()">Join Room</button>
 
             <p class="hint">Both participants join the same room to begin.</p>
+            <div class="demo-links">
+                <a class="demo-link" href="/demo/live">Live Demo URL</a>
+                <a class="demo-link" href="/demo/memory">Memory Demo URL</a>
+            </div>
         </div>
 
         <div class="active-rooms" id="activeRooms"></div>
@@ -242,6 +262,12 @@
             const name = document.getElementById('name').value.trim() || 'anon';
             const language = document.getElementById('language').value;
             window.location.href = `/room/${room}?name=${encodeURIComponent(name)}&language=${encodeURIComponent(language)}`;
+        }
+
+        const initialParams = new URLSearchParams(window.location.search);
+        const roomPrefill = initialParams.get('room');
+        if (roomPrefill) {
+            document.getElementById('room').value = roomPrefill;
         }
 
         document.querySelectorAll('input').forEach(el => {
